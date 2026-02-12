@@ -1,190 +1,219 @@
-Here is a fully regenerated README that removes explicit price dependence, reframes the project around perceived value and demand sensitivity, and stays academically and professionally strong.
+# Algorithmic Marketing Optimization in the Beauty Industry
 
-You can drop this directly into README.md.
+### Segmentation, Positioning, Perceived Value, Price Context, and Causal Attribution
 
-Algorithmic Marketing Optimization in the Beauty Industry
+---
 
-Segmentation, Positioning, Perceived Value, and Causal Attribution
+## Project Overview
 
-Project Overview
+This project builds an end-to-end algorithmic marketing framework for beauty products using publicly available e-commerce product and review data. The objective is to demonstrate how modern data science techniques can be applied to real-world digital marketing problems by jointly modeling consumer perception, perceived value, price context, and demand dynamics.
 
-This project builds an end-to-end algorithmic marketing framework for beauty products using publicly available e-commerce review data. The objective is to demonstrate how modern data science techniques can be applied to real-world digital marketing problems—without relying on transactional sales or price data—by modeling consumer perception, demand dynamics, and brand health.
+The beauty industry is highly competitive, review-driven, and reputation-sensitive. While prices are publicly observable, true demand, willingness-to-pay, and consumer expectations are not. Brands must therefore make product, pricing, and marketing decisions under uncertainty. This project addresses that challenge by combining large-scale review data with machine learning, natural language processing (NLP), pricing context, and causal inference to generate actionable marketing insights grounded in how consumers perceive value relative to price.
 
-The beauty industry is highly competitive, review-driven, and reputation-sensitive. Brands make product, positioning, and marketing decisions with limited visibility into true demand and consumer expectations. This project addresses that challenge by combining large-scale review data with machine learning, natural language processing (NLP), and causal inference to generate actionable marketing insights based on perceived value and consumer response.
+---
 
-Business Objectives
+## Business Objectives
 
-This project is designed to answer the following marketing questions:
+This project is designed to answer the following marketing and strategy questions:
 
-How can beauty products be segmented into meaningful, actionable groups based on consumer perception?
+* How can beauty products be segmented into meaningful, actionable groups based on consumer perception and price positioning?
+* How do brands compete in terms of perceived quality, outcomes, product claims, and price tiers?
+* What textual themes and experiences drive positive vs. negative consumer sentiment at different price points?
+* How sensitive is consumer demand to changes in perceived value relative to price, rather than price alone?
+* Which products and brands are price-resilient vs. price-sensitive in the face of reputation shocks?
+* How can marketing investments be allocated to maximize incremental consumer response given both perception and price context?
 
-How do brands compete in terms of perceived quality, outcomes, and product claims?
+---
 
-What textual themes and experiences drive positive vs. negative consumer sentiment?
+## Data Sources
 
-How sensitive is consumer demand to changes in perceived value and brand reputation?
+All data is sourced from publicly accessible e-commerce platforms. No login-restricted, proprietary, or personal user data is collected.
 
-How can marketing investments be allocated to maximize incremental consumer response?
+### Sephora (via public pages and review APIs)
 
-Data Sources
+* Product identifiers and metadata
+* Listed product prices (used as contextual features, not transactional outcomes)
+* Customer reviews with timestamps, ratings, and helpfulness votes
 
-All data is sourced from publicly accessible e-commerce review platforms. No login-restricted, proprietary, or personal user data is collected.
+### Demand & Value Proxies
 
-Sephora (via public review APIs)
+Demand and consumer response are proxied using:
 
-Product identifiers and metadata
+* Review volume
+* Review velocity over time
+* Rating levels and dispersion
+* Sentiment and topic dynamics
+* Price relative to peer products and segment norms
 
-Customer reviews with timestamps, ratings, and helpfulness votes
+---
 
-Demand is proxied using:
+## Project Components
 
-Review volume
+### 1. Market Segmentation
 
-Review velocity over time
+Product-level segmentation using clustering algorithms:
 
-Rating and sentiment dynamics
+* K-means
+* Hierarchical clustering
+* Gaussian Mixture Models
 
-Project Components
-1. Market Segmentation
+Segments are defined by:
 
-Product-level segmentation using clustering algorithms (K-means, hierarchical clustering, Gaussian Mixture Models)
+* Review volume and velocity
+* Rating distributions and stability
+* Sentiment scores
+* Topic prevalence from review text
+* Price levels and relative price positioning
 
-Segments defined by:
+Resulting segments represent distinct consumer expectation and value-for-money profiles, not just popularity tiers.
 
-Review volume and velocity
+---
 
-Rating distributions and consistency
+### 2. Recommendation Systems
 
-Sentiment scores
+Item-to-item product recommendations using content-based similarity:
 
-Topic prevalence from review text
+* Product attributes
+* Review text embeddings
+* Sentiment and topic alignment
+* Price proximity and substitution bands
 
-Actionable segment personas representing different consumer expectation profiles
+Used to identify:
 
-2. Recommendation Systems
+* Complementary products
+* Close substitutes
+* Trade-up and trade-down opportunities within price tiers
 
-Item-to-item product recommendations
+---
 
-Content-based similarity using:
-
-Product attributes
-
-Review text embeddings
-
-Identification of complementary and substitute products to support cross-sell and portfolio strategy
-
-3. Brand Health & Sentiment Analysis
+### 3. Brand Health & Sentiment Analysis
 
 NLP applied to customer reviews for:
 
-Sentiment scoring
+* Sentiment scoring
+* Topic modeling
+* Identification of:
 
-Topic modeling
+  * Brand delighters
+  * Brand disappointers
+  * Mismatches between star ratings and written sentiment
 
-Identification of:
+Brand health dashboards capture:
 
-Brand delighters
+* Experience drivers
+* Complaint concentration
+* Whether negative sentiment is driven by performance issues or perceived price unfairness
 
-Brand disappointers
+---
 
-Detection of mismatches between star ratings and written sentiment
+### 4. Competitive Positioning & Perceptual Mapping
 
-Brand perception dashboards capturing consumer experience drivers
+Competitive landscape analysis using:
 
-4. Competitive Positioning & Perceptual Mapping
+* PCA
+* Distance-based methods
 
-Dimensionality reduction using PCA and distance-based methods
+Brands and products are compared across:
 
-Competitive landscape analysis across:
+* Perceived efficacy
+* Experience quality
+* Consumer polarization
+* Market traction (review intensity)
+* Price positioning and perceived value efficiency
 
-Perceived efficacy
+This enables identification of:
 
-Experience quality
+* Overpriced vs. underpriced perception zones
+* Perceptual white spaces
+* Strategic repositioning opportunities
 
-Consumer polarization
+---
 
-Market traction (review intensity)
+### 5. Perceived Value, Price Context & Demand Sensitivity
 
-Identification of perceptual white spaces and strategic positioning opportunities
+Rather than estimating classical price elasticity from sales data, this project examines demand sensitivity to perceived value conditional on price.
 
-5. Perceived Value & Demand Sensitivity Analysis
+Models analyze how review velocity, sentiment, and rating behavior respond to:
 
-Rather than estimating explicit price elasticity, this module examines consumer sensitivity to perceived value.
+* Negative review shocks
+* Changes in topic prevalence
+* Rating declines
+* Price deviations from segment norms
 
-Modeling how review velocity and sentiment respond to:
+Products and segments are classified as:
 
-Negative review shocks
+* Price-resilient
+* Value-fragile
+* Reputation-sensitive
 
-Changes in topic prevalence
+Simulations explore marketing and pricing scenarios focused on:
 
-Rating declines
+* Expectation management
+* Value communication
+* Reputation recovery
+* Strategic price repositioning
 
-Identification of products and segments that are:
+---
 
-Reputation-sensitive
+### 6. Experimentation & Causal Attribution
 
-Resilient to negative feedback
+Quasi-experimental designs leveraging natural variation in review and pricing dynamics:
 
-Simulation of marketing scenarios focused on expectation management and reputation recovery
+* Difference-in-Differences
+* Matching approaches
 
-6. Experimentation & Causal Attribution
+Used to estimate:
 
-Quasi-experimental designs using natural variation in review dynamics
+* Incremental changes in consumer response
+* Brand recovery trajectories after perception shocks
+* Interaction effects between price level and reputation damage
 
-Difference-in-Differences and matching approaches
+Outputs support ROI-driven prioritization of marketing, pricing, and brand investment strategies.
 
-Estimation of:
+---
 
-Incremental changes in consumer response
+## Tools & Methods
 
-Brand recovery trajectories following perception shocks
+* Language: Python
+* Libraries: pandas, NumPy, scikit-learn, statsmodels, nltk, spaCy, requests, BeautifulSoup
+* Modeling Techniques: clustering, NLP, regression, causal inference
+* Visualization: matplotlib, seaborn, perceptual maps
 
-ROI-driven prioritization of marketing and brand investment strategies
+---
 
-Tools & Methods
+## Deliverables
 
-Language: Python
+* Executive-ready marketing insights and strategic recommendations
 
-Libraries: pandas, NumPy, scikit-learn, statsmodels, nltk, spaCy, requests, BeautifulSoup
+* Reproducible data pipelines and analysis code
 
-Modeling Techniques: clustering, NLP, regression, causal inference
+* Visual dashboards for:
 
-Visualization: matplotlib, seaborn, perceptual maps
+  * Market segmentation
+  * Sentiment and brand health
+  * Competitive positioning
+  * Perceived value vs. price efficiency
+  * Demand sensitivity
 
-Deliverables
+* Technical appendix documenting assumptions, limitations, and validation
 
-Executive-ready marketing insights and strategic recommendations
+* Managerial guidance for beauty brand, product, and pricing strategy
 
-Reproducible data pipelines and analysis code
+---
 
-Visual dashboards for:
-
-Segmentation
-
-Sentiment and brand health
-
-Competitive positioning
-
-Demand sensitivity
-
-Technical appendix documenting assumptions, limitations, and validation
-
-Managerial guidance for beauty brand and product strategy
-
-Use Cases
+## Use Cases
 
 This project is relevant for:
 
-Digital marketing and growth analytics
+* Digital marketing and growth analytics
+* Consumer packaged goods (CPG) analytics
+* E-commerce and marketplace strategy teams
+* Brand and product management
+* Pricing and value strategy
+* Applied data science and marketing analytics coursework
 
-Consumer packaged goods (CPG) analytics
+---
 
-E-commerce and marketplace strategy teams
-
-Brand and product management
-
-Applied data science and marketing analytics coursework
-
-Disclaimer
+## Disclaimer
 
 This project is conducted for educational and research purposes only. All data is sourced from publicly accessible pages and APIs. No proprietary, confidential, or personally identifiable user information is collected.
