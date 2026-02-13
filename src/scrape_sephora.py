@@ -36,7 +36,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # Tune these for your scale
 BRAND_LIMIT = 500         # how many brands to scrape
 PRODUCTS_PER_BRAND = 50   # max product URLs per brand
-MAX_BRAND_SCROLLS = 20    # scroll iterations per brand page
+MAX_BRAND_SCROLLS = 40    # scroll iterations per brand page
 PRODUCT_LIMIT_TOTAL = 5000 # global cap across brands (safety)
 REVIEWS_PAGES = 3         # pages of reviews per product (20 each)
 
@@ -53,7 +53,8 @@ BV_TIMEOUT = 20
 # Helpers
 # -------------------------
 
-def polite_sleep(a=1.5, b=3.5):
+# 1. Increase polite_sleep ranges significantly
+def polite_sleep(a=3.0, b=7.0):
     time.sleep(random.uniform(a, b))
 
 def norm_url(u: str) -> str:
@@ -156,15 +157,17 @@ def make_driver(headless=False):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--window-size=1920,1080")
 
     driver = uc.Chrome(options=options, headless=headless)
     driver.set_page_load_timeout(60)
 
-    # Warm-up (cookies / consent / akamai)
+    # Warm-up — visit homepage and browse a bit like a real user
     driver.get(BASE + "/")
     time.sleep(10)
+    driver.execute_script("window.scrollBy(0, 300);")
+    time.sleep(3)
     return driver
-
 
 # -------------------------
 # Brand URL collection
@@ -300,11 +303,11 @@ def get_product_urls_from_brand(driver, brand_url, limit=50):
 
         if is_404_url(cur):
             # Some brands auto-redirect; try stripping further (rare)
-            print("⚠️ 404 page detected. Skipping brand.")
+            print("404 page detected. Skipping brand.")
             return []
 
         if is_access_denied(html):
-            print("⚠️ Access Denied detected. Skipping brand.")
+            print("Access Denied detected. Skipping brand.")
             return []
 
         # Wait for something that indicates product listing exists.
@@ -332,7 +335,7 @@ def get_product_urls_from_brand(driver, brand_url, limit=50):
             return urls
 
         # If no URLs found, refresh and retry
-        print(f"⚠️ No product tiles found (attempt {attempt}/3). Refreshing…")
+        print(f"No product tiles found (attempt {attempt}/3). Refreshing…")
         driver.refresh()
         time.sleep(6)
 
@@ -584,7 +587,7 @@ def fetch_reviews(bv_id, p_number, max_pages=2):
             break
 
     if all_reviews:
-        print(f"    ✅ Success: Found {len(all_reviews)} reviews for {p_number}")
+        print(f"    Success: Found {len(all_reviews)} reviews for {p_number}")
 
     return all_reviews
 
@@ -595,71 +598,159 @@ def fetch_reviews(bv_id, p_number, max_pages=2):
 def main():
     driver = make_driver(headless=False)
 
-    print("Collecting brands...")
-    brand_urls = get_brand_urls(driver, limit=BRAND_LIMIT)
-    print(f"✅ Collected {len(brand_urls)} real brand URLs")
+    # Load ALL existing product IDs across all files
+    all_existing_pids = set()
 
-    all_products = []
-    all_reviews = []
-    seen_product_ids = set()
-
-    for brand_url in brand_urls:
-        print(f"Brand: {brand_url}")
-
-        product_urls = get_product_urls_from_brand(driver, brand_url, limit=PRODUCTS_PER_BRAND)
-        if not product_urls:
-            print("⚠️ No product URLs found. Skipping brand.")
+    for csv_file in OUTPUT_DIR.glob("sephora_products*.csv"):
+        try:
+            df = pd.read_csv(csv_file)
+            all_existing_pids.update(df["product_id"].dropna().astype(str))
+            print(f"📂 Loaded {len(df)} products from {csv_file.name}")
+        except Exception:
             continue
 
-        for url in product_urls:
-            if len(seen_product_ids) >= PRODUCT_LIMIT_TOTAL:
-                break
+    print(f"Total already-scraped products: {len(all_existing_pids)}")
 
-            print(f"  Product: {url}")
-            
-            # 1. Scrape full product info (Brand, Name, Category, Price, etc.)
-            prod = scrape_product_page(driver, url)
-            
-            if not prod:
-                print("    ⚠️ Failed to parse product page.")
-                continue
+    # Track scraped brand slugs using exact URL slugs (not name conversion)
+    brands_done_path = OUTPUT_DIR / "scraped_brand_slugs.txt"
+    if brands_done_path.exists():
+        all_existing_brand_slugs = set(brands_done_path.read_text().strip().splitlines())
+    else:
+        all_existing_brand_slugs = set()
 
-            # Skip if we've already processed this ID (prevents duplicates across brands/categories)
-            pid = prod["product_id"]
-            if pid in seen_product_ids:
-                continue
-            seen_product_ids.add(pid)
+    print(f"Already-scraped brand slugs: {len(all_existing_brand_slugs)}")
 
-            all_products.append(prod)
+    print("Collecting brands...")
+    brand_urls = get_brand_urls(driver, limit=BRAND_LIMIT)
+    print(f"Collected {len(brand_urls)} real brand URLs")
 
-            # 2. Fetch Reviews using the Numeric ID and the Labeling ID
-            # FIX: We pass BOTH arguments now to match the new fetch_reviews(bv_id, p_number) signature
-            revs = fetch_reviews(prod["bv_product_id"], prod["product_id"], max_pages=REVIEWS_PAGES)
-            
-            if revs:
-                all_reviews.extend(revs)
-            else:
-                print(f"    ⚠️ No reviews found for {pid}")
+    # Output files for this run
+    products_path = OUTPUT_DIR / "sephora_products.csv"
+    reviews_path = OUTPUT_DIR / "sephora_reviews.csv"
 
-            polite_sleep(1.5, 3.0)
+    # Load partial progress from sephora_products
+    if products_path.exists():
+        try:
+            existing_run = pd.read_csv(products_path)
+            all_existing_pids.update(existing_run["product_id"].dropna().astype(str))
+            print(f"Resuming: {len(existing_run)} products already in {products_path.name}")
+        except Exception:
+            pass
+
+    seen_product_ids = set(all_existing_pids)
+    new_products_this_run = 0
+
+    for brand_url in brand_urls:
+        brand_slug = brand_url.rstrip("/").split("/")[-1].lower()
+
+        # Skip brands already scraped (exact URL slug match)
+        if brand_slug in all_existing_brand_slugs:
+            print(f"Skipping already-scraped brand: {brand_slug}")
+            continue
 
         if len(seen_product_ids) >= PRODUCT_LIMIT_TOTAL:
             print("Reached global product cap; stopping.")
             break
 
+        print(f"\nBrand: {brand_url}")
+
+        product_urls = get_product_urls_from_brand(driver, brand_url, limit=PRODUCTS_PER_BRAND)
+        if not product_urls:
+            if is_access_denied(driver.page_source):
+                print("Access Denied! Restarting browser with fresh session...")
+                driver.quit()
+                time.sleep(random.uniform(60, 90))
+                driver = make_driver(headless=False)
+                # Retry this brand once with the new session
+                product_urls = get_product_urls_from_brand(driver, brand_url, limit=PRODUCTS_PER_BRAND)
+
+            if not product_urls:
+                print("No product URLs found. Skipping brand.")
+                all_existing_brand_slugs.add(brand_slug)
+                with open(brands_done_path, "a") as f:
+                    f.write(brand_slug + "\n")
+                continue
+
+        # Early exit: if first 3 real products are all already known, skip this brand
+        first_pids = []
+        for u in product_urls[:5]:
+            m = re.search(r"P(\d+)", u)
+            if m:
+                first_pids.append(m.group(1))
+        if first_pids and all(pid in seen_product_ids for pid in first_pids):
+            print(f"  All sample products already scraped. Skipping brand.")
+            all_existing_brand_slugs.add(brand_slug)
+            with open(brands_done_path, "a") as f:
+                f.write(brand_slug + "\n")
+            continue
+
+        brand_products = []
+        brand_reviews = []
+
+        for url in product_urls:
+            if len(seen_product_ids) >= PRODUCT_LIMIT_TOTAL:
+                break
+
+            pid_match = re.search(r"P(\d+)", url)
+            if pid_match and pid_match.group(1) in seen_product_ids:
+                print(f"  Already have {url}, skipping.")
+                continue
+
+            print(f"  Product: {url}")
+
+            prod = scrape_product_page(driver, url)
+
+            if not prod:
+                print("    Failed to parse product page.")
+                continue
+
+            pid = prod["product_id"]
+            if pid in seen_product_ids:
+                continue
+            seen_product_ids.add(pid)
+
+            brand_products.append(prod)
+
+            revs = fetch_reviews(prod["bv_product_id"], prod["product_id"], max_pages=REVIEWS_PAGES)
+
+            if revs:
+                brand_reviews.extend(revs)
+            else:
+                print(f"    No reviews found for {pid}")
+
+            polite_sleep(5.0, 12.0)
+
+        # --- Save after every brand (incremental / crash-safe) ---
+        if brand_products:
+            pd.DataFrame(brand_products).to_csv(
+                products_path,
+                mode="a",
+                header=not products_path.exists(),
+                index=False,
+            )
+            new_products_this_run += len(brand_products)
+
+        if brand_reviews:
+            pd.DataFrame(brand_reviews).to_csv(
+                reviews_path,
+                mode="a",
+                header=not reviews_path.exists(),
+                index=False,
+            )
+
+        # Mark brand as done with exact URL slug
+        all_existing_brand_slugs.add(brand_slug)
+        with open(brands_done_path, "a") as f:
+            f.write(brand_slug + "\n")
+
+        print(f"  Saved {len(brand_products)} products, {len(brand_reviews)} reviews for {brand_slug}")
+
     driver.quit()
 
-    # 3. Create DataFrames and Save to CSV
-    products_df = pd.DataFrame(all_products)
-    reviews_df = pd.DataFrame(all_reviews)
-
-    # Save results to the specified output directory
-    products_df.to_csv(OUTPUT_DIR / "sephora_products.csv", index=False)
-    reviews_df.to_csv(OUTPUT_DIR / "sephora_reviews.csv", index=False)
-
     print("\n--- Scrape Complete ---")
-    print(f"Total Products: {len(products_df)}")
-    print(f"Total Reviews:  {len(reviews_df)}")
+    print(f"New products this run: {new_products_this_run}")
+    print(f"Total products across all files: {len(seen_product_ids)}")
+
 
 if __name__ == "__main__":
     main()
