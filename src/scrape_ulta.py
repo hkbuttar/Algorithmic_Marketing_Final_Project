@@ -118,7 +118,7 @@ def make_driver(headless=False):
 # -------------------------
 
 def get_brand_urls(driver, limit=500):
-    driver.get(BASE + "/brands")
+    driver.get(BASE + "/brand/all")
     time.sleep(PAGE_LOAD_SLEEP)
 
     # Scroll to load all brand links
