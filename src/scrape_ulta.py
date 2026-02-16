@@ -389,18 +389,21 @@ def scrape_product_page(driver, url):
             rating = m.group(1)
 
     # --- Category from breadcrumbs ---
+    # --- Category from breadcrumbs ---
     if not category:
-        bc_items = soup.select("nav[aria-label='breadcrumb'] li, nav.Breadcrumb li, ol.breadcrumb li")
+        bc_items = soup.select("ul.Breadcrumbs__List li.Breadcrumbs__List--item span.pal-c-Link__label")
         if bc_items:
-            texts = [li.get_text(strip=True) for li in bc_items if li.get_text(strip=True).lower() != "home"]
+            texts = [s.get_text(strip=True) for s in bc_items if s.get_text(strip=True).lower() != "home"]
+            if texts:
+                category = texts[-1]  # Last breadcrumb = most specific category
+
+    if not category:
+        bc_items = soup.select("nav.breadcrumbs li a span")
+        if bc_items:
+            texts = [s.get_text(strip=True) for s in bc_items if s.get_text(strip=True).lower() != "home"]
             if texts:
                 category = texts[-1]
-
-    if not category:
-        bc = driver.find_elements(By.CSS_SELECTOR, "nav[aria-label='breadcrumb'] li")
-        if bc:
-            category = bc[-1].text.strip()
-
+                
     return {
         "product_id": pid,
         "product_url": url,
