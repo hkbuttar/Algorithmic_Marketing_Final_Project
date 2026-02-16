@@ -305,11 +305,13 @@ All analyses converge into a unified strategic framework addressing:
 ```
 data/
     raw/
+        scraped_brand_slugs.txt
         sephora_products.csv
+        sephora_products2.csv
         sephora_reviews.csv
+        sephora_reviews2.csv
         ulta_products.csv
         ulta_reviews.csv
-        scraped_brand_slugs.txt
         ulta_scraped_brand_slugs.txt
     processed/
         sephora/
