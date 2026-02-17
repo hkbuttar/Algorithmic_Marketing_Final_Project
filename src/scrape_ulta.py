@@ -102,7 +102,13 @@ def make_driver(headless=False):
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--window-size=1920,1080")
 
-    driver = uc.Chrome(options=options, headless=headless)
+    driver = uc.Chrome(
+    version_main=144,
+    options=options,
+    use_subprocess=True,
+    headless=headless
+)
+
     driver.set_page_load_timeout(60)
 
     # Warm-up
