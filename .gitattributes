@@ -4,3 +4,5 @@ data/raw/*.csv filter=lfs diff=lfs merge=lfs -text
 *.json filter=lfs diff=lfs merge=lfs -text
 *.zip filter=lfs diff=lfs merge=lfs -text
 *.gz filter=lfs diff=lfs merge=lfs -text
+data/raw/ulta_reviews3.csv filter=lfs diff=lfs merge=lfs -text
+data/raw/ulta_products3.csv filter=lfs diff=lfs merge=lfs -text
