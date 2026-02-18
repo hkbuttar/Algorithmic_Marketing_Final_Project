@@ -545,8 +545,8 @@ def main():
     print(f" Collected {len(brand_urls)} real brand URLs")
 
     # Output files
-    products_path = OUTPUT_DIR / "ulta_products3.csv"
-    reviews_path  = OUTPUT_DIR / "ulta_reviews3.csv"
+    products_path = OUTPUT_DIR / "ulta_products4.csv"
+    reviews_path  = OUTPUT_DIR / "ulta_reviews4.csv"
 
     # Load partial progress
     if products_path.exists():
