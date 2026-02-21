@@ -34,10 +34,10 @@ OUTPUT_DIR = Path("data/raw")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Tune these for your scale
-BRAND_LIMIT         = 500      # how many brands to scrape
+BRAND_LIMIT         = 5000      # how many brands to scrape
 PRODUCTS_PER_BRAND  = 50       # max product URLs per brand
 MAX_BRAND_SCROLLS   = 40       # scroll iterations per brand page
-PRODUCT_LIMIT_TOTAL = 5000     # global cap across brands (safety)
+PRODUCT_LIMIT_TOTAL = 50000     # global cap across brands (safety)
 MAX_REVIEWS_PER_PRODUCT = 300  # max reviews per product
 
 # Selenium timeouts
@@ -545,8 +545,8 @@ def main():
     print(f" Collected {len(brand_urls)} real brand URLs")
 
     # Output files
-    products_path = OUTPUT_DIR / "ulta_products4.csv"
-    reviews_path  = OUTPUT_DIR / "ulta_reviews4.csv"
+    products_path = OUTPUT_DIR / "ulta_products5.csv"
+    reviews_path  = OUTPUT_DIR / "ulta_reviews5.csv"
 
     # Load partial progress
     if products_path.exists():
