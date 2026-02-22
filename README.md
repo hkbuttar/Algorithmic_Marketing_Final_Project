@@ -1,5 +1,3 @@
-markdown
-
 # Algorithmic Marketing Optimization in the Beauty Industry
 
 ### A Cross-Retailer Framework: Sephora x Ulta
@@ -311,7 +309,13 @@ data/
         sephora_reviews.csv
         sephora_reviews2.csv
         ulta_products.csv
+        ulta_products3.csv
+        ulta_products4.csv
+        ulta_products5.csv
         ulta_reviews.csv
+        ulta_reviews3.csv
+        ulta_reviews4.csv
+        ulta_reviews5.csv
         ulta_scraped_brand_slugs.txt
     processed/
         sephora/
