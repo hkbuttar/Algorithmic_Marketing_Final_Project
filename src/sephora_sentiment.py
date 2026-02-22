@@ -46,6 +46,14 @@ import numpy as np
 import re
 import warnings
 from pathlib import Path
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import NMF
+from scipy.stats import entropy
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import ipywidgets as widgets
+from IPython.display import display, HTML
 
 warnings.filterwarnings("ignore")
 
@@ -116,12 +124,6 @@ def _load_data():
 # ============================================================
 def run_pipeline():
     """Run the full brand health pipeline (Steps 1–9) and save CSVs."""
-
-    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.decomposition import NMF
-    from scipy.stats import entropy
-    import plotly.graph_objects as go
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -543,7 +545,6 @@ def run_pipeline():
 
 def _build_overview(brand_agg):
     """Build the brand health overview scatter."""
-    import plotly.graph_objects as go
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -588,8 +589,6 @@ def build_brand_dashboard(brand_name):
     Build a 12-panel brand health dashboard for a single brand.
     Loads from CSVs if data not already in memory.
     """
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
 
     _load_data()
     brand_agg = _data["brand_agg"]
@@ -833,8 +832,6 @@ def show_dashboard():
         from sephora_brand_health import show_dashboard
         show_dashboard()
     """
-    import ipywidgets as widgets
-    from IPython.display import display, HTML
 
     _load_data()
     brands = _data["dashboard_brands"]
