@@ -30,9 +30,6 @@ ULTA_REVIEW_COLS = ["pd_id", "review_id", "Rating", "headline", "ReviewText",
                     "helpful_votes", "not_helpful_votes", "is_verified_buyer",
                     "is_verified_reviewer", "disclosure_code"]
 
-PRODUCT_COLS = ["product_id", "product_url", "brand", "product_name",
-                "category", "price", "rating"]
-
 
 # -------------------------
 # Auto-detect retailer
@@ -176,7 +173,7 @@ def merge_extra_columns(parsed, expected_n, header):
     When a row has too many columns due to unquoted commas in text,
     find the text field and merge the extra parts back together.
     """
-    text_fields = {"ReviewText", "headline", "product_name"}
+    text_fields = {"ReviewText", "headline"}
 
     text_idx = None
     for i, col in enumerate(header):
@@ -240,10 +237,9 @@ def merge_product_files(pattern, id_col="product_id"):
     frames = []
     for f in files:
         try:
-            df = load_reviews_safe(f, expected_cols=PRODUCT_COLS)
-            if df is not None and len(df) > 0:
-                print(f"  Loaded {len(df):,} rows from {f.name}")
-                frames.append(df)
+            df = pd.read_csv(f, engine="python", on_bad_lines="warn")
+            print(f"  Loaded {len(df):,} rows from {f.name}")
+            frames.append(df)
         except Exception as e:
             print(f"  Failed to load {f.name}: {e}")
 
