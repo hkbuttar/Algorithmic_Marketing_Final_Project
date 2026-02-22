@@ -16,3 +16,5 @@ data/processed/ulta_reviews.csv filter=lfs diff=lfs merge=lfs -text
 data/processed/ulta_products.csv filter=lfs diff=lfs merge=lfs -text
 data/processed/matched_products.csv filter=lfs diff=lfs merge=lfs -text
 data/processed/matched_reviews.csv filter=lfs diff=lfs merge=lfs -text
+data/processed/sephora_segmentation.csv filter=lfs diff=lfs merge=lfs -text
+data/processed/ulta_segmentation.csv filter=lfs diff=lfs merge=lfs -text
