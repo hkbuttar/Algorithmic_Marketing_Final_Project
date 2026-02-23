@@ -301,49 +301,144 @@ All analyses converge into a unified strategic framework addressing:
 ## Repository Structure
 
 ```
-data/
-    raw/
-        scraped_brand_slugs.txt
-        sephora_products.csv
-        sephora_products2.csv
-        sephora_reviews.csv
-        sephora_reviews2.csv
-        ulta_products.csv
-        ulta_products3.csv
-        ulta_products4.csv
-        ulta_products5.csv
-        ulta_reviews.csv
-        ulta_reviews3.csv
-        ulta_reviews4.csv
-        ulta_reviews5.csv
-        ulta_scraped_brand_slugs.txt
-    processed/
-        sephora/
-        ulta/
-        matched/                  # Cross-retailer linked products
-src/
-    scrape_sephora.py
-    scrape_ulta.py
-notebooks/
-    02_independent/
-        sephora_segmentation.ipynb
-        sephora_sentiment.ipynb
-        ulta_segmentation.ipynb
-        ulta_sentiment.ipynb
-    03_joint/
-        brand_product_linkage.ipynb
-        cross_platform_segmentation.ipynb
-        sentiment_gap_analysis.ipynb
-        combined_recommendations.ipynb
-    04_comparative/
-        dual_retailer_positioning.ipynb
-        demand_sensitivity.ipynb
-        causal_attribution.ipynb
-        convergent_strategy.ipynb
-outputs/                          # Figures, dashboards, reports
-README.md
-requirements.txt
-.gitignore                        # Excludes data/, outputs/, credentials
+ALGORITHMIC_MARKETING_FINAL_PROJECT/
+├── data/
+│   ├── processed/
+│   │   ├── Matched/
+│   │   │   ├── brand_mapping.csv
+│   │   │   ├── cross_retailer_graph.png
+│   │   │   ├── graph_edges.csv
+│   │   │   ├── graph_nodes.csv
+│   │   │   ├── graph_summary.txt
+│   │   │   ├── matched_pairs.csv
+│   │   │   ├── matched_products.csv
+│   │   │   ├── matched_reviews.csv
+│   │   │   └── product_graph.gpickle
+│   │   ├── Sephora/
+│   │   │   ├── sephora_brand_health.csv
+│   │   │   ├── sephora_brand_topic_labels.csv
+│   │   │   ├── sephora_cluster_labels.csv
+│   │   │   ├── sephora_complaint_concentration.csv
+│   │   │   ├── sephora_delighters_disappointers.csv
+│   │   │   ├── sephora_products.csv
+│   │   │   ├── sephora_recommendations.csv
+│   │   │   ├── sephora_reviews_enriched.csv
+│   │   │   ├── sephora_reviews.csv
+│   │   │   ├── sephora_segmentation.csv
+│   │   │   ├── sephora_topic_drivers.csv
+│   │   │   ├── sephora_topic_labels.csv
+│   │   │   └── sephora_value_perception.csv
+│   │   └── Ulta/
+│   │       ├── ulta_brand_health.csv
+│   │       ├── ulta_brand_topic_labels.csv
+│   │       ├── ulta_cluster_labels.csv
+│   │       ├── ulta_complaint_concentration.csv
+│   │       ├── ulta_delighters_disappointers.csv
+│   │       ├── ulta_products.csv
+│   │       ├── ulta_recommendations.csv
+│   │       ├── ulta_reviews_enriched.csv
+│   │       ├── ulta_reviews.csv
+│   │       ├── ulta_segmentation.csv
+│   │       ├── ulta_topic_drivers.csv
+│   │       ├── ulta_topic_labels.csv
+│   │       └── ulta_value_perception.csv
+│   └── raw/
+│       ├── scraped_brand_slugs.txt
+│       ├── sephora_products.csv
+│       ├── sephora_products2.csv
+│       ├── sephora_reviews.csv
+│       ├── sephora_reviews2.csv
+│       ├── ulta_products.csv
+│       ├── ulta_products3.csv
+│       ├── ulta_products4.csv
+│       ├── ulta_products5.csv
+│       ├── ulta_reviews.csv
+│       ├── ulta_reviews3.csv
+│       ├── ulta_reviews4.csv
+│       ├── ulta_reviews5.csv
+│       └── ulta_scraped_brand_slugs.txt
+├── notebooks/
+│   ├── comparative/
+│   ├── independent/
+│   │   ├── outputs/
+│   │   │   ├── sephora_segmentation/
+│   │   │   │   ├── gmm_uw_bic_aic_silhouette.png
+│   │   │   │   ├── gmm_w_bic_aic_silhouette.png
+│   │   │   │   ├── hc_uw_dendrogram.png
+│   │   │   │   ├── hc_uw_silhouette.png
+│   │   │   │   ├── hc_w_dendrogram.png
+│   │   │   │   ├── hc_w_silhouette.png
+│   │   │   │   ├── km_uw_elbow_silhouette.png
+│   │   │   │   ├── km_w_elbow_silhouette.png
+│   │   │   │   ├── profile_gmm_unweighted.png
+│   │   │   │   ├── profile_gmm_weighted.png
+│   │   │   │   ├── profile_hierarchical_unweighted.png
+│   │   │   │   ├── profile_hierarchical_weighted.png
+│   │   │   │   ├── profile_kmeans_unweighted.png
+│   │   │   │   └── profile_kmeans_weighted.png
+│   │   │   └── ulta_segmentation/
+│   │   │       ├── gmm_uw_bic_aic_silhouette.png
+│   │   │       ├── gmm_w_bic_aic_silhouette.png
+│   │   │       ├── hc_uw_dendrogram.png
+│   │   │       ├── hc_uw_silhouette.png
+│   │   │       ├── hc_w_dendrogram.png
+│   │   │       ├── hc_w_silhouette.png
+│   │   │       ├── km_uw_elbow_silhouette.png
+│   │   │       ├── km_w_elbow_silhouette.png
+│   │   │       ├── profile_gmm_unweighted.png
+│   │   │       ├── profile_gmm_weighted.png
+│   │   │       ├── profile_hierarchical_unweighted.png
+│   │   │       ├── profile_hierarchical_weighted.png
+│   │   │       ├── profile_kmeans_unweighted.png
+│   │   │       └── profile_kmeans_weighted.png
+│   │   ├── sephora_recommendations.ipynb
+│   │   ├── sephora_segmentation.ipynb
+│   │   ├── sephora_sentiment.ipynb
+│   │   ├── ulta_recommendations.ipynb
+│   │   ├── ulta_segmentation.ipynb
+│   │   └── ulta_sentiment.ipynb
+│   └── joint/
+│       ├── outputs/
+│       │   ├── 2.2_brand_consistency.png
+│       │   ├── 2.2_segment_divergence.png
+│       │   ├── 2.2_segment_flow.png
+│       │   ├── 2.2_segment_heatmap.png
+│       │   ├── 2.3_brand_sentiment_gap.png
+│       │   ├── 2.3_category_sentiment_gap.png
+│       │   ├── 2.3_delta_distributions.png
+│       │   ├── 2.3_gap_scatter.png
+│       │   ├── 2.3_platform_delighters.png
+│       │   ├── 2.3_platform_profile.png
+│       │   ├── 2.4_brand_price_gap.png
+│       │   ├── 2.4_category_price_gap.png
+│       │   ├── 2.4_price_parity_overview.png
+│       │   ├── 2.4_price_tier_analysis.png
+│       │   ├── 2.4_price_vs_experience_delta.png
+│       │   ├── 2.4_price_vs_value_scatter.png
+│       │   ├── 2.4_value_efficiency.png
+│       │   └── product_graph_fig.png
+│       ├── matched_segmentation.ipynb
+│       ├── perceived_value.ipynb
+│       ├── product_graph.ipynb
+│       └── setiment_gap.ipynb
+├── src/
+│   ├── __pycache__/
+│   ├── __init__.py
+│   ├── brand_matching.py
+│   ├── build_product_graph.py
+│   ├── data_cleaning.py
+│   ├── scrape_sephora.py
+│   ├── scrape_ulta.py
+│   ├── segmentation_features.py
+│   ├── sephora_recommendations.py
+│   ├── sephora_sentiment.py
+│   ├── ulta_recommendations.py
+│   ├── ulta_sentiment.py
+│   └── utils.py
+├── venv_scrape/
+├── .gitattributes
+├── README.md
+└── requirements.txt
 ```
 
 ---
