@@ -1,0 +1,56 @@
+================================================================
+  Cross-Retailer Product Graph — Summary
+  Ulta-primary | fuzzy match threshold = 0.65
+================================================================
+
+Node counts:
+  Brand nodes              :    142
+  Matched product nodes    :    379
+  Sephora SKU nodes        :    379
+  Ulta SKU nodes           :    379
+  Ulta-only nodes          :  3,433
+  Total nodes              :  4,712
+
+Ulta catalog coverage:
+  Total Ulta products      :  3,812
+  Matched to Sephora       :    379  (9.9%)
+  Ulta-only (unmatched)    :  3,433  (90.1%)
+
+Edge counts:
+  has_product                   :  3,812
+  sephora_listing               :    379
+  ulta_listing                  :    379
+  cross_platform_match          :    758
+  Total                         :  5,328
+
+Price delta (Sephora − Ulta), matched products only:
+  Mean          : $+0.60
+  Median        : $+0.00
+  Sephora higher: 59  (15.6%)
+  Ulta higher   : 70  (18.5%)
+  Parity |Δ|≤$1 : 257  (67.8%)
+
+Rating delta (Sephora − Ulta), matched products only:
+  Mean          : -0.114 ★
+  Median        : -0.097 ★
+  Sephora higher: 122
+  Ulta higher   : 255
+
+Top 15 brands by total product count:
+  Brand                                Total   Matched   Ulta-only
+  --------------------------------------------------------------
+  Charlotte Tilbury                       50         3          47
+  HOURGLASS                               50         4          46
+  NATASHA DENONA                          49         2          47
+  Dior                                    49         2          47
+  FENTY BEAUTY by Rihanna                 49         2          47
+  Tarte                                   49         2          47
+  The Ordinary                            48         5          43
+  Briogeo                                 48         4          44
+  bareMinerals                            48         3          45
+  Milani                                  48         0          48
+  IGK                                     47         6          41
+  Origins                                 47         3          44
+  amika                                   47         2          45
+  RMS Beauty                              47         0          47
+  Moroccanoil                             46         5          41
