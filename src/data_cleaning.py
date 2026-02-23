@@ -6,10 +6,10 @@
 # Auto-detects Sephora vs Ulta review files by header inspection.
 #
 # Outputs:
-#   data/processed/sephora_products.csv
-#   data/processed/sephora_reviews.csv
-#   data/processed/ulta_products.csv
-#   data/processed/ulta_reviews.csv
+#   data/processed/Sephora/sephora_products.csv
+#   data/processed/Sephora/sephora_reviews.csv
+#   data/processed/Ulta/ulta_products.csv
+#   data/processed/Ulta/ulta_reviews.csv
 
 import pandas as pd
 import numpy as np
@@ -31,9 +31,7 @@ ULTA_REVIEW_COLS = ["pd_id", "review_id", "Rating", "headline", "ReviewText",
                     "is_verified_reviewer", "disclosure_code"]
 
 
-# -------------------------
 # Auto-detect retailer
-# -------------------------
 
 def detect_review_type(filepath):
     """
@@ -48,9 +46,7 @@ def detect_review_type(filepath):
         return "sephora", SEPHORA_REVIEW_COLS
 
 
-# -------------------------
 # Safe CSV loader
-# -------------------------
 
 def load_reviews_safe(filepath, expected_cols=None):
     """
@@ -106,9 +102,7 @@ def load_reviews_safe(filepath, expected_cols=None):
     return df
 
 
-# -------------------------
 # Manual CSV reconstruction
-# -------------------------
 
 def reconstruct_csv(filepath, expected_cols):
     """
@@ -198,9 +192,7 @@ def merge_extra_columns(parsed, expected_n, header):
     return None
 
 
-# -------------------------
 # Multiline fix
-# -------------------------
 
 def fix_multiline_reviews(df, text_col="ReviewText"):
     """
@@ -221,9 +213,7 @@ def fix_multiline_reviews(df, text_col="ReviewText"):
     return df
 
 
-# -------------------------
 # Merge batch files
-# -------------------------
 
 def merge_product_files(pattern, id_col="product_id"):
     """
@@ -297,9 +287,7 @@ def merge_review_files(pattern):
     return merged
 
 
-# -------------------------
 # Clean products
-# -------------------------
 
 def clean_products(df, retailer):
     """
@@ -323,9 +311,7 @@ def clean_products(df, retailer):
     return df
 
 
-# -------------------------
 # Remove products with no reviews & orphan reviews
-# -------------------------
 
 def remove_products_without_reviews(products_df, reviews_df, pid_col="pd_id", product_id_col="product_id"):
     """
@@ -349,9 +335,7 @@ def remove_products_without_reviews(products_df, reviews_df, pid_col="pd_id", pr
     return products_df, reviews_df
 
 
-# -------------------------
 # Drop incomplete reviews (min 20 per product)
-# -------------------------
 
 def clean_reviews_with_floor(df, required_cols, pid_col="pd_id", min_reviews=20):
     """
@@ -388,15 +372,11 @@ def clean_reviews_with_floor(df, required_cols, pid_col="pd_id", min_reviews=20)
     return result
 
 
-# -------------------------
 # Main
-# -------------------------
 
 def main():
     # Step 1: Merge batch files
-    print("=" * 60)
     print("STEP 1: MERGING BATCH FILES")
-    print("=" * 60)
 
     print("\n--- Sephora Products ---")
     seph_products = merge_product_files("sephora_products*.csv")
@@ -411,9 +391,7 @@ def main():
     ulta_reviews = merge_review_files("ulta_reviews*.csv")
 
     # Step 2: Fix multi-line reviews
-    print("\n" + "=" * 60)
     print("STEP 2: FIXING MULTI-LINE REVIEWS")
-    print("=" * 60)
 
     seph_reviews = fix_multiline_reviews(seph_reviews, text_col="ReviewText")
     print(f"  Sephora: fixed multi-line ReviewText")
@@ -424,17 +402,13 @@ def main():
     print(f"  Ulta: fixed multi-line ReviewText + headline")
 
     # Step 3: Clean products
-    print("\n" + "=" * 60)
     print("STEP 3: REMOVING PRODUCTS WITH MISSING INFO")
-    print("=" * 60)
 
     seph_products = clean_products(seph_products, "Sephora")
     ulta_products = clean_products(ulta_products, "Ulta")
 
     # Step 4: Remove products with no reviews & orphan reviews
-    print("\n" + "=" * 60)
     print("STEP 4: REMOVING PRODUCTS WITH NO REVIEWS")
-    print("=" * 60)
 
     print("  Sephora:")
     seph_products, seph_reviews = remove_products_without_reviews(
@@ -446,9 +420,7 @@ def main():
     )
 
     # Step 5: Drop incomplete reviews with floor protection
-    print("\n" + "=" * 60)
     print("STEP 5: CLEANING REVIEWS (MIN 20 PER PRODUCT)")
-    print("=" * 60)
 
     sephora_required = [c for c in SEPHORA_REVIEW_COLS if c != "pd_id"]
     ulta_required = [c for c in ULTA_REVIEW_COLS if c not in ("pd_id", "disclosure_code")]
@@ -466,9 +438,7 @@ def main():
     )
 
     # Step 6: Final reconciliation
-    print("\n" + "=" * 60)
     print("STEP 6: FINAL RECONCILIATION")
-    print("=" * 60)
 
     print("  Sephora:")
     seph_products, seph_reviews = remove_products_without_reviews(
@@ -480,21 +450,17 @@ def main():
     )
 
     # Save
-    print("\n" + "=" * 60)
     print("SAVING TO data/processed/")
-    print("=" * 60)
 
-    seph_products.to_csv(PROCESSED_DIR / "sephora_products.csv", index=False)
-    seph_reviews.to_csv(PROCESSED_DIR / "sephora_reviews.csv", index=False)
-    ulta_products.to_csv(PROCESSED_DIR / "ulta_products.csv", index=False)
-    ulta_reviews.to_csv(PROCESSED_DIR / "ulta_reviews.csv", index=False)
+    seph_products.to_csv(PROCESSED_DIR / "Sephora" / "sephora_products.csv", index=False)
+    seph_reviews.to_csv(PROCESSED_DIR / "Sephora" / "sephora_reviews.csv", index=False)
+    ulta_products.to_csv(PROCESSED_DIR / "Ulta" / "ulta_products.csv", index=False)
+    ulta_reviews.to_csv(PROCESSED_DIR / "Ulta" / "ulta_reviews.csv", index=False)
 
     print(f"  Saved 4 files to {PROCESSED_DIR}/")
 
     # Summary
-    print("\n" + "=" * 60)
     print("SUMMARY")
-    print("=" * 60)
     print(f"  Sephora: {len(seph_products):,} products | {len(seph_reviews):,} reviews")
     print(f"  Ulta:    {len(ulta_products):,} products | {len(ulta_reviews):,} reviews")
     print(f"\n  Avg reviews per product:")

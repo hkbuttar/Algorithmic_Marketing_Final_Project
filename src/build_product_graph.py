@@ -62,7 +62,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
+# Paths 
 BASE_DIR    = Path(__file__).resolve().parent.parent
 MATCHED_DIR = BASE_DIR / "data" / "processed" / "matched"
 OUT_DIR     = MATCHED_DIR
@@ -70,13 +70,13 @@ MATCHED_DIR.mkdir(parents=True, exist_ok=True)
 
 CATALOG_PATH = MATCHED_DIR / "matched_products.csv"   # long-format combined catalog
 
-# ── Tunable matching threshold ─────────────────────────────────────────────────
+# Tunable matching threshold
 # Pairs with similarity < MATCH_THRESHOLD are kept as ulta_only.
 # 0.65 is a good balance: eliminates clearly wrong matches while allowing
 # minor wording differences (e.g. "Nourishing Hair Mask" vs "Nourishing Mask").
 MATCH_THRESHOLD = 0.65
 
-# ── Colour palette (shared across all viz modes) ───────────────────────────────
+# Colour palette (shared across all viz modes)
 COLORS = {
     "brand":           "#2196F3",
     "matched_product": "#FF9800",
@@ -86,9 +86,7 @@ COLORS = {
 }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 #  STEP 1 — NAME CLEANING
-# ══════════════════════════════════════════════════════════════════════════════
 def clean_product_name(name: str, brand: str) -> str:
     """
     Normalise a product name for fuzzy comparison.
@@ -113,9 +111,7 @@ def clean_product_name(name: str, brand: str) -> str:
     return re.sub(r"\s+", " ", name).strip().lower()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 #  STEP 2 — FUZZY MATCHING
-# ══════════════════════════════════════════════════════════════════════════════
 def _similarity(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, a, b).ratio()
 
@@ -205,15 +201,11 @@ def match_products(
     return pd.DataFrame(pairs)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 #  STEP 3 — BUILD GRAPH
-# ══════════════════════════════════════════════════════════════════════════════
 def build_graph(threshold: float = MATCH_THRESHOLD) -> nx.DiGraph:
-    print("=" * 64)
     print("  Cross-Retailer Product Graph Builder  (Ulta-primary)")
-    print("=" * 64)
 
-    # ── Load catalog ───────────────────────────────────────────
+    # Load catalog
     print(f"\n[1/6] Loading {CATALOG_PATH.name} ...")
     catalog = pd.read_csv(CATALOG_PATH, low_memory=False)
     print(f"      {len(catalog):,} total rows | cols: {list(catalog.columns)}")
@@ -229,7 +221,7 @@ def build_graph(threshold: float = MATCH_THRESHOLD) -> nx.DiGraph:
     )
     print(f"      Shared brands: {len(shared_brands):,}")
 
-    # ── Fuzzy match ────────────────────────────────────────────
+    # Fuzzy match
     print(f"\n[2/6] Fuzzy-matching products within shared brands "
           f"(threshold={threshold}) ...")
     pairs_df = match_products(sephora_df, ulta_df, threshold=threshold)
@@ -249,7 +241,7 @@ def build_graph(threshold: float = MATCH_THRESHOLD) -> nx.DiGraph:
     pairs_df.to_csv(pairs_path, index=False)
     print(f"      Saved → {pairs_path.name}")
 
-    # ── Build NetworkX graph ───────────────────────────────────
+    # Build NetworkX graph
     print("\n[3/6] Building NetworkX DiGraph ...")
     G = nx.DiGraph()
     node_records: list[dict] = []
@@ -274,7 +266,7 @@ def build_graph(threshold: float = MATCH_THRESHOLD) -> nx.DiGraph:
             })
         return bid
 
-    # ── Pass 1: matched pairs ──────────────────────────────────
+    # Pass 1: matched pairs
     for _, row in pairs_df.iterrows():
         mid   = str(row["match_id"])
         brand_id = _ensure_brand(
@@ -357,7 +349,7 @@ def build_graph(threshold: float = MATCH_THRESHOLD) -> nx.DiGraph:
     matched_count = sum(1 for _, d in G.nodes(data=True)
                         if d.get("node_type") == "matched_product")
 
-    # ── Pass 2: Ulta-only products ─────────────────────────────
+    # Pass 2: Ulta-only products
     ulta_only_df = ulta_df[
         ~ulta_df["product_id"].astype(str).isin(matched_ulta_ids)
     ].copy()
@@ -392,7 +384,7 @@ def build_graph(threshold: float = MATCH_THRESHOLD) -> nx.DiGraph:
     print(f"      Total  → {G.number_of_nodes():,} nodes | "
           f"{G.number_of_edges():,} edges")
 
-    # ── Export CSVs ────────────────────────────────────────────
+    # Export CSVs
     print("\n[4/6] Exporting graph CSVs ...")
     nodes_df = pd.DataFrame(node_records).drop_duplicates(subset=["node_id"])
     edges_df = pd.DataFrame(edge_records)
@@ -405,11 +397,11 @@ def build_graph(threshold: float = MATCH_THRESHOLD) -> nx.DiGraph:
         pickle.dump(G, f, protocol=pickle.HIGHEST_PROTOCOL)
     print("      product_graph.gpickle saved")
 
-    # ── Summary ────────────────────────────────────────────────
+    # Summary
     print("\n[5/6] Writing graph_summary.txt ...")
     _write_summary(G, len(ulta_df), matched_count, ulta_only_count, threshold)
 
-    # ── Default viz ────────────────────────────────────────────
+    # Default viz
     print("\n[6/6] Saving default visualization ...")
     fig = visualize_graph(G, mode="brand_network", top_n=15, show=False)
     fig.savefig(OUT_DIR / "cross_retailer_graph.png", dpi=150, bbox_inches="tight")
@@ -425,7 +417,7 @@ def build_graph(threshold: float = MATCH_THRESHOLD) -> nx.DiGraph:
     return G
 
 
-# ── Summary ────────────────────────────────────────────────────────────────────
+# Summary
 def _write_summary(
     G: nx.DiGraph,
     ulta_total: int,
@@ -511,9 +503,7 @@ def _write_summary(
         f.write(text)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  VISUALIZATIONS  —  all return fig for notebook use
-# ══════════════════════════════════════════════════════════════════════════════
+# VISUALIZATIONS  —  all return fig for notebook use
 def visualize_graph(
     G: nx.DiGraph,
     mode: str = "brand_network",
@@ -749,9 +739,7 @@ def _viz_coverage(G, top_n, figsize):
     return fig
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  I/O HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
+# I/O HELPERS
 def load_graph(auto_build: bool = True) -> nx.DiGraph:
     """
     Load the saved product graph.  Runs build_graph() automatically if the
@@ -813,7 +801,5 @@ def get_ulta_only_products(G: nx.DiGraph) -> pd.DataFrame:
         if d.get("node_type") == "ulta_only"
     ])
 
-
-# ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     G = build_graph()

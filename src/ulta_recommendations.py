@@ -1,7 +1,5 @@
 # ulta_recommendations.py
-# ═══════════════════════════════════════════════════════════════════════════════
 # 1.3 — Ulta Item-to-Item Marketing Recommendation System
-# ═══════════════════════════════════════════════════════════════════════════════
 #
 # Ulta-specific: verification provenance (buyer/reviewer/disclosure) as
 # structural signal — two products with identical ratings but different
@@ -29,7 +27,7 @@ warnings.filterwarnings("ignore")
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent
-PROCESSED_DIR = _PROJECT_ROOT / "data" / "processed"
+PROCESSED_DIR = _PROJECT_ROOT / "data" / "processed" / "Ulta"
 MIN_REVIEWS = 20
 TOP_N_SUB = 5
 TOP_N_COMP = 5
@@ -39,9 +37,7 @@ TOP_N_TRADE = 3
 _data = {}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # DATA LOADING
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def _load_data():
     """Load pre-built CSV for dashboard use. Called lazily."""
@@ -75,9 +71,7 @@ def _load_data():
     print(f"  Loaded {len(products):,} products in {elapsed:.1f}s")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # FEATURE BLOCKS — ULTA-SPECIFIC
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def _build_feature_blocks(df):
     blocks = {}
@@ -233,9 +227,7 @@ def _generate_csv(df, sub, comp, trade_up, trade_dn):
     return pd.DataFrame(rows)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # PIPELINE
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def run_pipeline():
     """Run full computation pipeline. Saves CSV. Then use show_dashboard()."""
@@ -317,9 +309,7 @@ def run_pipeline():
     print(f"\n{'█'*70}\n")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # DASHBOARD: build_product_dashboard() → plotly figure
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def build_product_dashboard(product_id):
     """
@@ -368,7 +358,7 @@ def build_product_dashboard(product_id):
     src_vb = float(row.get("pct_verified_buyer", 0) or 0)
     src_disc = float(row.get("pct_has_disclosure", 0) or 0)
 
-    # ── Helper: extract data, short labels + hover ──────────────────────
+    # Helper: extract data, short labels + hover
     def _extract(prefix, top_n):
         items = []
         for rk in range(1, top_n + 1):
@@ -411,7 +401,7 @@ def build_product_dashboard(product_id):
             return "#27ae60"  # organic verified
         return "#3498db"      # low
 
-    # ── Substitutes (row 1) — colored by verification ───────────────────
+    # Substitutes (row 1) — colored by verification
     items, short, hover = _extract("sub", TOP_N_SUB)
     if items:
         colors_v = [_verif_color(it) for it in items]
@@ -436,7 +426,7 @@ def build_product_dashboard(product_id):
         fig.add_shape(type="line", x0=src_sent, x1=src_sent, y0=-0.5, y1=len(items)-0.5,
                       line=dict(color="red", dash="dash", width=2), row=1, col=2)
 
-    # ── Complements (row 2) ─────────────────────────────────────────────
+    # Complements (row 2)
     items, short, hover = _extract("comp", TOP_N_COMP)
     if items:
         short_c = [f"#{i+1} {it['cat'][:20]}" for i, it in enumerate(items)]
@@ -456,7 +446,7 @@ def build_product_dashboard(product_id):
             hovertext=hover[::-1], hoverinfo="text",
         ), row=2, col=2)
 
-    # ── Trade-Up (row 3, col 1) ─────────────────────────────────────────
+    # Trade-Up (row 3, col 1)
     items, short, hover = _extract("tradeup", TOP_N_TRADE)
     if items:
         fig.add_trace(go.Bar(
@@ -469,7 +459,7 @@ def build_product_dashboard(product_id):
         fig.add_shape(type="line", x0=src_price, x1=src_price, y0=-0.5, y1=len(items)-0.5,
                       line=dict(color="red", dash="dash", width=2), row=3, col=1)
 
-    # ── Trade-Down (row 3, col 2) ───────────────────────────────────────
+    # Trade-Down (row 3, col 2)
     items, short, hover = _extract("tradedn", TOP_N_TRADE)
     if items:
         fig.add_trace(go.Bar(
@@ -482,7 +472,7 @@ def build_product_dashboard(product_id):
         fig.add_shape(type="line", x0=src_price, x1=src_price, y0=-0.5, y1=len(items)-0.5,
                       line=dict(color="red", dash="dash", width=2), row=3, col=2)
 
-    # ── Score summary + table (row 4) ───────────────────────────────────
+    # Score summary + table (row 4)
     intent_names, intent_scores = [], []
     for prefix, label, top_n in [("sub", "Substitutes", TOP_N_SUB),
                                   ("comp", "Complements", TOP_N_COMP),
@@ -535,7 +525,7 @@ def build_product_dashboard(product_id):
         ),
     ), row=4, col=2)
 
-    # ── Layout ──────────────────────────────────────────────────────────
+    # Layout
     product_name = row.get("product_name", "")
     brand = row.get("brand", "")
     category = row.get("category", "")
@@ -581,9 +571,7 @@ def build_product_dashboard(product_id):
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # DASHBOARD: show_dashboard() — ipywidgets dropdown
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def show_dashboard():
     """
@@ -631,6 +619,5 @@ def show_dashboard():
         build_product_dashboard(products[0][1]).show()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     run_pipeline()

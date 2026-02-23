@@ -3,14 +3,14 @@
 # review metrics (sentiment, topics, ratings, velocity) to the product level.
 #
 # Inputs:
-#   data/processed/sephora_products.csv
-#   data/processed/sephora_reviews.csv
-#   data/processed/ulta_products.csv
-#   data/processed/ulta_reviews.csv
+#   data/processed/Sephora/sephora_products.csv
+#   data/processed/Sephora/sephora_reviews.csv
+#   data/processed/Ulta/ulta_products.csv
+#   data/processed/Ulta/ulta_reviews.csv
 #
 # Outputs:
-#   data/processed/sephora_segmentation.csv
-#   data/processed/ulta_segmentation.csv
+#   data/processed/Sephora/sephora_segmentation.csv
+#   data/processed/Ulta/ulta_segmentation.csv
 
 import pandas as pd
 import numpy as np
@@ -45,9 +45,7 @@ def clean_text(text):
     return text
 
 
-# -------------------------
 # Sentiment scoring
-# -------------------------
 
 def score_sentiment(reviews_df, text_col="ReviewText"):
     """
@@ -71,9 +69,7 @@ def score_sentiment(reviews_df, text_col="ReviewText"):
     return reviews_df
 
 
-# -------------------------
 # Topic modeling
-# -------------------------
 
 def extract_topics(reviews_df, text_col="ReviewText", n_topics=N_TOPICS):
     """
@@ -123,9 +119,7 @@ def extract_topics(reviews_df, text_col="ReviewText", n_topics=N_TOPICS):
     return reviews_df, topic_labels
 
 
-# -------------------------
 # Product-level aggregation
-# -------------------------
 
 def aggregate_to_product(products_df, reviews_df, retailer):
     """
@@ -301,9 +295,7 @@ def aggregate_to_product(products_df, reviews_df, retailer):
     return merged
 
 
-# -------------------------
 # Main
-# -------------------------
 
 def main():
     # Load data
@@ -311,10 +303,10 @@ def main():
     print("LOADING DATA")
     print("=" * 60)
 
-    seph_products = pd.read_csv(PROCESSED_DIR / "sephora_products.csv", dtype=str)
-    seph_reviews = pd.read_csv(PROCESSED_DIR / "sephora_reviews.csv", dtype=str)
-    ulta_products = pd.read_csv(PROCESSED_DIR / "ulta_products.csv", dtype=str)
-    ulta_reviews = pd.read_csv(PROCESSED_DIR / "ulta_reviews.csv", dtype=str)
+    seph_products = pd.read_csv(PROCESSED_DIR / "Sephora" / "sephora_products.csv", dtype=str)
+    seph_reviews = pd.read_csv(PROCESSED_DIR / "Sephora" / "sephora_reviews.csv", dtype=str)
+    ulta_products = pd.read_csv(PROCESSED_DIR / "Ulta" / "ulta_products.csv", dtype=str)
+    ulta_reviews = pd.read_csv(PROCESSED_DIR / "Ulta" / "ulta_reviews.csv", dtype=str)
 
     print(f"  Sephora: {len(seph_products):,} products | {len(seph_reviews):,} reviews")
     print(f"  Ulta:    {len(ulta_products):,} products | {len(ulta_reviews):,} reviews")
@@ -346,8 +338,8 @@ def main():
     print("SAVING")
     print("=" * 60)
 
-    seph_seg.to_csv(PROCESSED_DIR / "sephora_segmentation.csv", index=False)
-    ulta_seg.to_csv(PROCESSED_DIR / "ulta_segmentation.csv", index=False)
+    seph_seg.to_csv(PROCESSED_DIR / "Sephora/sephora_segmentation.csv", index=False)
+    ulta_seg.to_csv(PROCESSED_DIR / "Ulta/ulta_segmentation.csv", index=False)
 
     print(f"  Saved sephora_segmentation.csv ({len(seph_seg):,} rows)")
     print(f"  Saved ulta_segmentation.csv ({len(ulta_seg):,} rows)")

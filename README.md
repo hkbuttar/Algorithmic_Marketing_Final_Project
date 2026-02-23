@@ -376,21 +376,23 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   │   │   │   ├── profile_hierarchical_weighted.png
 │   │   │   │   ├── profile_kmeans_unweighted.png
 │   │   │   │   └── profile_kmeans_weighted.png
-│   │   │   └── ulta_segmentation/
-│   │   │       ├── gmm_uw_bic_aic_silhouette.png
-│   │   │       ├── gmm_w_bic_aic_silhouette.png
-│   │   │       ├── hc_uw_dendrogram.png
-│   │   │       ├── hc_uw_silhouette.png
-│   │   │       ├── hc_w_dendrogram.png
-│   │   │       ├── hc_w_silhouette.png
-│   │   │       ├── km_uw_elbow_silhouette.png
-│   │   │       ├── km_w_elbow_silhouette.png
-│   │   │       ├── profile_gmm_unweighted.png
-│   │   │       ├── profile_gmm_weighted.png
-│   │   │       ├── profile_hierarchical_unweighted.png
-│   │   │       ├── profile_hierarchical_weighted.png
-│   │   │       ├── profile_kmeans_unweighted.png
-│   │   │       └── profile_kmeans_weighted.png
+│   │   │   ├── ulta_segmentation/
+│   │   │   │   ├── gmm_uw_bic_aic_silhouette.png
+│   │   │   │   ├── gmm_w_bic_aic_silhouette.png
+│   │   │   │   ├── hc_uw_dendrogram.png
+│   │   │   │   ├── hc_uw_silhouette.png
+│   │   │   │   ├── hc_w_dendrogram.png
+│   │   │   │   ├── hc_w_silhouette.png
+│   │   │   │   ├── km_uw_elbow_silhouette.png
+│   │   │   │   ├── km_w_elbow_silhouette.png
+│   │   │   │   ├── profile_gmm_unweighted.png
+│   │   │   │   ├── profile_gmm_weighted.png
+│   │   │   │   ├── profile_hierarchical_unweighted.png
+│   │   │   │   ├── profile_hierarchical_weighted.png
+│   │   │   │   ├── profile_kmeans_unweighted.png
+│   │   │   │   └── profile_kmeans_weighted.png
+│   │   │   ├── sephora_brand_health_overview.html
+│   │   │   └── ulta_brand_health_overview.html
 │   │   ├── sephora_recommendations.ipynb
 │   │   ├── sephora_segmentation.ipynb
 │   │   ├── sephora_sentiment.ipynb

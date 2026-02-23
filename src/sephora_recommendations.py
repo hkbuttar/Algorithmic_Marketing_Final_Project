@@ -13,7 +13,7 @@
 #   1.2 → brand health & sentiment (embedded in segmentation)
 #
 # Outputs:
-#   data/processed/sephora_recommendations.csv
+#   data/processed/Sephora/sephora_recommendations.csv
 #
 # Notebook usage:
 #   from src.sephora_recommendations import show_dashboard
@@ -30,7 +30,7 @@ warnings.filterwarnings("ignore")
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent
-PROCESSED_DIR = _PROJECT_ROOT / "data" / "processed"
+PROCESSED_DIR = _PROJECT_ROOT / "data" / "processed" / "Sephora"
 MIN_REVIEWS = 20
 TOP_N_SUB = 5
 TOP_N_COMP = 5
@@ -40,9 +40,7 @@ TOP_N_TRADE = 3
 _data = {}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # DATA LOADING (lazy, for dashboard)
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def _load_data():
     """Load pre-built CSV for dashboard use. Called lazily on first dashboard call."""
@@ -77,9 +75,7 @@ def _load_data():
     print(f"  Loaded {len(products):,} products in {elapsed:.1f}s")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # FEATURE BLOCKS & SIMILARITY (for run_pipeline)
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def _build_feature_blocks(df):
     blocks = {}
@@ -215,9 +211,7 @@ def _generate_csv(df, sub, comp, trade_up, trade_dn):
     return pd.DataFrame(rows)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # PIPELINE
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def run_pipeline():
     """Run full computation pipeline. Saves CSV. Then use show_dashboard()."""
@@ -285,9 +279,7 @@ def run_pipeline():
     print(f"\n{'█'*70}\n")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # DASHBOARD: build_product_dashboard() → plotly figure
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def build_product_dashboard(product_id):
     """
@@ -361,7 +353,7 @@ def build_product_dashboard(product_id):
         ]
         return items, short, hover
 
-    # ── Substitutes (row 1) ─────────────────────────────────────────────
+    #Substitutes (row 1)
     items, short, hover = _extract("sub", TOP_N_SUB)
     if items:
         fig.add_trace(go.Bar(
@@ -385,7 +377,7 @@ def build_product_dashboard(product_id):
         fig.add_shape(type="line", x0=src_sent, x1=src_sent, y0=-0.5, y1=len(items)-0.5,
                       line=dict(color="red", dash="dash", width=2), row=1, col=2)
 
-    # ── Complements (row 2) ─────────────────────────────────────────────
+    # Complements (row 2)
     items, short, hover = _extract("comp", TOP_N_COMP)
     if items:
         # Use category in short label instead of brand
@@ -406,7 +398,7 @@ def build_product_dashboard(product_id):
             hovertext=hover[::-1], hoverinfo="text",
         ), row=2, col=2)
 
-    # ── Trade-Up (row 3, col 1) ─────────────────────────────────────────
+    # Trade-Up (row 3, col 1)
     items, short, hover = _extract("tradeup", TOP_N_TRADE)
     if items:
         fig.add_trace(go.Bar(
@@ -419,7 +411,7 @@ def build_product_dashboard(product_id):
         fig.add_shape(type="line", x0=src_price, x1=src_price, y0=-0.5, y1=len(items)-0.5,
                       line=dict(color="red", dash="dash", width=2), row=3, col=1)
 
-    # ── Trade-Down (row 3, col 2) ───────────────────────────────────────
+    # Trade-Down (row 3, col 2)
     items, short, hover = _extract("tradedn", TOP_N_TRADE)
     if items:
         fig.add_trace(go.Bar(
@@ -432,7 +424,7 @@ def build_product_dashboard(product_id):
         fig.add_shape(type="line", x0=src_price, x1=src_price, y0=-0.5, y1=len(items)-0.5,
                       line=dict(color="red", dash="dash", width=2), row=3, col=2)
 
-    # ── Score summary + table (row 4) ───────────────────────────────────
+    # Score summary + table (row 4)
     intent_names, intent_scores = [], []
     for prefix, label, top_n in [("sub", "Substitutes", TOP_N_SUB),
                                   ("comp", "Complements", TOP_N_COMP),
@@ -481,7 +473,7 @@ def build_product_dashboard(product_id):
         ),
     ), row=4, col=2)
 
-    # ── Layout ──────────────────────────────────────────────────────────
+    # Layout
     product_name = row.get("product_name", "")
     brand = row.get("brand", "")
     category = row.get("category", "")
@@ -513,9 +505,7 @@ def build_product_dashboard(product_id):
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # DASHBOARD: show_dashboard() — ipywidgets dropdown
-# ═══════════════════════════════════════════════════════════════════════════════
 
 def show_dashboard():
     """
@@ -563,6 +553,5 @@ def show_dashboard():
         build_product_dashboard(products[0][1]).show()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     run_pipeline()

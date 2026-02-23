@@ -4,15 +4,15 @@
 # under matched brands into unified CSVs with normalized column names.
 #
 # Inputs:
-#   data/processed/sephora_products.csv
-#   data/processed/sephora_reviews.csv
-#   data/processed/ulta_products.csv
-#   data/processed/ulta_reviews.csv
+#   data/processed/Sephora/sephora_products.csv
+#   data/processed/Sephora/sephora_reviews.csv
+#   data/processed/Ulta/ulta_products.csv
+#   data/processed/Ulta/ulta_reviews.csv
 #
 # Outputs:
-#   data/processed/matched_products.csv
-#   data/processed/matched_reviews.csv
-#   data/processed/brand_mapping.csv  (brand name crosswalk for reference)
+#   data/processed/Matched/matched_products.csv
+#   data/processed/Matched/matched_reviews.csv
+#   data/processed/Matched/brand_mapping.csv  (brand name crosswalk for reference)
 
 import pandas as pd
 import numpy as np
@@ -26,9 +26,7 @@ PROCESSED_DIR = Path("data/processed")
 FUZZY_THRESHOLD = 0.80
 
 
-# -------------------------
 # Brand name normalization
-# -------------------------
 
 def normalize_brand(name):
     """
@@ -44,9 +42,7 @@ def normalize_brand(name):
     return name
 
 
-# -------------------------
 # Multi-strategy brand matching
-# -------------------------
 
 def match_brands(sephora_brands, ulta_brands):
     """
@@ -142,9 +138,7 @@ def token_set_similarity(a, b):
     return max(scores)
 
 
-# -------------------------
 # Normalize reviews to shared schema
-# -------------------------
 
 def normalize_sephora_reviews(df):
     """
@@ -213,28 +207,22 @@ REVIEW_COLS = [
 ]
 
 
-# -------------------------
 # Main
-# -------------------------
 
 def main():
     # Load processed data
-    print("=" * 60)
     print("LOADING PROCESSED DATA")
-    print("=" * 60)
 
-    seph_products = pd.read_csv(PROCESSED_DIR / "sephora_products.csv", dtype=str)
-    seph_reviews = pd.read_csv(PROCESSED_DIR / "sephora_reviews.csv", dtype=str)
-    ulta_products = pd.read_csv(PROCESSED_DIR / "ulta_products.csv", dtype=str)
-    ulta_reviews = pd.read_csv(PROCESSED_DIR / "ulta_reviews.csv", dtype=str)
+    seph_products = pd.read_csv(PROCESSED_DIR / "Sephora" / "sephora_products.csv", dtype=str)
+    seph_reviews = pd.read_csv(PROCESSED_DIR / "Sephora" / "sephora_reviews.csv", dtype=str)
+    ulta_products = pd.read_csv(PROCESSED_DIR / "Ulta" / "ulta_products.csv", dtype=str)
+    ulta_reviews = pd.read_csv(PROCESSED_DIR / "Ulta" / "ulta_reviews.csv", dtype=str)
 
     print(f"  Sephora: {len(seph_products):,} products | {len(seph_reviews):,} reviews")
     print(f"  Ulta:    {len(ulta_products):,} products | {len(ulta_reviews):,} reviews")
 
     # Normalize brand names
-    print("\n" + "=" * 60)
     print("MATCHING BRANDS")
-    print("=" * 60)
 
     seph_products["brand_normalized"] = seph_products["brand"].apply(normalize_brand)
     ulta_products["brand_normalized"] = ulta_products["brand"].apply(normalize_brand)
@@ -274,13 +262,11 @@ def main():
         }
         for s, u in sorted(brand_map.items())
     ])
-    brand_mapping_df.to_csv(PROCESSED_DIR / "brand_mapping.csv", index=False)
+    brand_mapping_df.to_csv(PROCESSED_DIR / "Matched" / "brand_mapping.csv", index=False)
     print(f"\n  Saved brand_mapping.csv ({len(brand_mapping_df)} brand pairs)")
 
     # Filter products to matched brands
-    print("\n" + "=" * 60)
     print("FILTERING TO MATCHED BRANDS")
-    print("=" * 60)
 
     matched_seph_brands = set(brand_map.keys())
     matched_ulta_brands = set(brand_map.values())
@@ -306,9 +292,7 @@ def main():
     print(f"  Combined matched products: {len(matched_products):,}")
 
     # Filter reviews to matched products
-    print("\n" + "=" * 60)
     print("FILTERING REVIEWS TO MATCHED PRODUCTS")
-    print("=" * 60)
 
     seph_matched_pids = set(seph_matched["product_id"].astype(str).str.strip())
     ulta_matched_pids = set(ulta_matched["product_id"].astype(str).str.strip())
@@ -323,9 +307,7 @@ def main():
     print(f"  Ulta reviews from matched products:    {len(ulta_reviews_matched):,}")
 
     # Normalize review columns to shared schema
-    print("\n" + "=" * 60)
     print("NORMALIZING REVIEW COLUMNS")
-    print("=" * 60)
 
     seph_reviews_norm = normalize_sephora_reviews(seph_reviews_matched)
     ulta_reviews_norm = normalize_ulta_reviews(ulta_reviews_matched)
@@ -338,20 +320,16 @@ def main():
     print(f"  Combined matched reviews: {len(matched_reviews):,}")
 
     # Save
-    print("\n" + "=" * 60)
     print("SAVING")
-    print("=" * 60)
 
-    matched_products.to_csv(PROCESSED_DIR / "matched_products.csv", index=False)
-    matched_reviews.to_csv(PROCESSED_DIR / "matched_reviews.csv", index=False)
+    matched_products.to_csv(PROCESSED_DIR / "Matched" / "matched_products.csv", index=False)
+    matched_reviews.to_csv(PROCESSED_DIR / "Matched" / "matched_reviews.csv", index=False)
 
     print(f"  Saved matched_products.csv ({len(matched_products):,} rows)")
     print(f"  Saved matched_reviews.csv ({len(matched_reviews):,} rows)")
 
     # Summary
-    print("\n" + "=" * 60)
     print("SUMMARY")
-    print("=" * 60)
     print(f"  Matched brands: {len(brand_map):,}")
     print(f"  Matched products: {len(matched_products):,} ({len(seph_matched):,} Sephora + {len(ulta_matched):,} Ulta)")
     print(f"  Matched reviews:  {len(matched_reviews):,} ({len(seph_reviews_matched):,} Sephora + {len(ulta_reviews_matched):,} Ulta)")

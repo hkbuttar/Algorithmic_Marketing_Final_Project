@@ -25,20 +25,20 @@ Dashboard (Step 10, runs via show_dashboard()):
   Interactive Plotly + ipywidgets brand toggle over ALL brands.
 
 Inputs:
-  data/processed/sephora_products.csv
-  data/processed/sephora_reviews.csv
+  data/processed/Sephora/sephora_products.csv
+  data/processed/Sephora/sephora_reviews.csv
 
 Outputs (CSVs):
-  data/processed/sephora_brand_health.csv
-  data/processed/sephora_reviews_enriched.csv
-  data/processed/sephora_topic_drivers.csv
-  data/processed/sephora_brand_topic_labels.csv
-  data/processed/sephora_delighters_disappointers.csv
-  data/processed/sephora_complaint_concentration.csv
-  data/processed/sephora_value_perception.csv
+  data/processed/Sephora/sephora_brand_health.csv
+  data/processed/Sephora/sephora_reviews_enriched.csv
+  data/processed/Sephora/sephora_topic_drivers.csv
+  data/processed/Sephora/sephora_brand_topic_labels.csv
+  data/processed/Sephora/sephora_delighters_disappointers.csv
+  data/processed/Sephora/sephora_complaint_concentration.csv
+  data/processed/Sephora/sephora_value_perception.csv
 
 Outputs (HTML):
-  outputs/sephora_brand_health_overview.html
+  notebooks/independent/outputs/sephora_brand_health_overview.html
 """
 
 import pandas as pd
@@ -57,13 +57,11 @@ from IPython.display import display, HTML
 
 warnings.filterwarnings("ignore")
 
-# ============================================================
 # Constants
-# ============================================================
 _SCRIPT_DIR = Path(__file__).resolve().parent          # src/
 PROJECT_ROOT = _SCRIPT_DIR.parent                       # Algorithmic_Marketing_Final_Project/
-PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
-OUTPUT_DIR = PROJECT_ROOT / "outputs"
+PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "Sephora"
+OUTPUT_DIR = PROJECT_ROOT / "notebooks" / "independent" /"outputs"
 MIN_BRAND_REVIEWS = 30
 N_TOPICS = 12
 MIN_REVIEW_LENGTH = 20
@@ -73,9 +71,7 @@ VALUE_KEYWORDS = [
     "rip off", "not worth", "pay", "paid", "dollar", "buck",
 ]
 
-# ============================================================
 # Module-level data (populated by run_pipeline() or _load_data())
-# ============================================================
 _data = {}
 
 
@@ -119,20 +115,14 @@ def _load_data():
           f"{len(_data['reviews']):,} reviews in {elapsed:.1f}s")
 
 
-# ============================================================
 # PIPELINE: run_pipeline()
-# ============================================================
 def run_pipeline():
     """Run the full brand health pipeline (Steps 1–9) and save CSVs."""
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # ============================================================
     # STEP 1: Load, Merge, Clean
-    # ============================================================
-    print("=" * 60)
     print("STEP 1: Loading and cleaning data")
-    print("=" * 60)
 
     products = pd.read_csv(PROCESSED_DIR / "sephora_products.csv")
     reviews = pd.read_csv(PROCESSED_DIR / "sephora_reviews.csv")
@@ -166,12 +156,8 @@ def run_pipeline():
     print(f"  Unique brands: {reviews['brand'].nunique()}")
     print(f"  Unique products: {reviews['pd_id'].nunique()}")
 
-    # ============================================================
     # STEP 2: Sentiment Scoring (VADER)
-    # ============================================================
-    print("\n" + "=" * 60)
     print("STEP 2: Sentiment scoring (VADER)")
-    print("=" * 60)
 
     analyzer = SentimentIntensityAnalyzer()
 
@@ -193,12 +179,8 @@ def run_pipeline():
     print(f"  Negative: {(reviews['sentiment_label'] == 'negative').mean():.1%}")
     print(f"  Mean compound: {reviews['sentiment_compound'].mean():.3f}")
 
-    # ============================================================
     # STEP 3: Rating–Sentiment Mismatch Detection
-    # ============================================================
-    print("\n" + "=" * 60)
     print("STEP 3: Rating-sentiment mismatch detection")
-    print("=" * 60)
 
     reviews["rating_normalized"] = (reviews["Rating"] - 3) / 2
     reviews["rating_sentiment_gap"] = reviews["rating_normalized"] - reviews["sentiment_compound"]
@@ -220,12 +202,8 @@ def run_pipeline():
     for mt, count in reviews["mismatch_type"].value_counts().items():
         print(f"    {mt}: {count:,} ({count / len(reviews):.1%})")
 
-    # ============================================================
     # STEP 4: Topic Modeling (NMF on TF-IDF)
-    # ============================================================
-    print("\n" + "=" * 60)
     print(f"STEP 4: Topic modeling (NMF, {N_TOPICS} topics)")
-    print("=" * 60)
 
     tfidf = TfidfVectorizer(
         max_features=8000, min_df=10, max_df=0.85,
@@ -253,12 +231,8 @@ def run_pipeline():
     reviews["dominant_topic"] = W.argmax(axis=1)
     reviews["topic_confidence"] = W.max(axis=1)
 
-    # ============================================================
     # STEP 5: Topic–Sentiment Linkage (Drivers)
-    # ============================================================
-    print("\n" + "=" * 60)
     print("STEP 5: Topic-sentiment driver analysis")
-    print("=" * 60)
 
     print("\n  Global topic-sentiment correlations:")
     for col in topic_cols:
@@ -285,12 +259,8 @@ def run_pipeline():
     topic_drivers_df = pd.DataFrame(brand_topic_drivers)
     print(f"\n  Brand x topic driver matrix: {topic_drivers_df.shape}")
 
-    # ============================================================
     # STEP 6: Delighters vs. Disappointers per Brand
-    # ============================================================
-    print("\n" + "=" * 60)
     print("STEP 6: Delighters vs. disappointers")
-    print("=" * 60)
 
     delighters_disappointers = []
     for brand, bdf in reviews.groupby("brand"):
@@ -325,13 +295,9 @@ def run_pipeline():
     for role in ["delighter", "disappointer", "neutral"]:
         print(f"  {role}: {(dd_df['role'] == role).sum()} brand-topic pairs")
 
-    # ============================================================
     # STEP 7: Complaint Concentration Analysis
-    # ============================================================
-    print("\n" + "=" * 60)
     print("STEP 7: Complaint concentration analysis")
-    print("=" * 60)
-
+    
     complaint_rows = []
     for brand, bdf in reviews.groupby("brand"):
         if len(bdf) < MIN_BRAND_REVIEWS:
@@ -367,13 +333,9 @@ def run_pipeline():
     for label, count in complaint_df["complaint_concentration_label"].value_counts().items():
         print(f"    {label}: {count} brands")
 
-    # ============================================================
     # STEP 8: Price/Value Perception Diagnostics
-    # ============================================================
-    print("\n" + "=" * 60)
     print("STEP 8: Price/value perception diagnostics")
-    print("=" * 60)
-
+    
     value_pattern = "|".join(VALUE_KEYWORDS)
     reviews["mentions_value"] = reviews["clean_text"].str.lower().str.contains(
         value_pattern, regex=True, na=False,
@@ -417,12 +379,8 @@ def run_pipeline():
     for label, count in value_df["value_driver_label"].value_counts().items():
         print(f"    {label}: {count} brands")
 
-    # ============================================================
     # STEP 9: Brand-Level Aggregation
-    # ============================================================
-    print("\n" + "=" * 60)
     print("STEP 9: Brand-level aggregation")
-    print("=" * 60)
 
     brand_agg = reviews.groupby("brand").agg(
         n_reviews=("clean_text", "count"),
@@ -488,13 +446,9 @@ def run_pipeline():
     brand_agg = brand_agg.sort_values("n_reviews", ascending=False).reset_index(drop=True)
     print(f"  Dashboard shape: {brand_agg.shape}")
 
-    # ============================================================
     # Save CSVs
-    # ============================================================
-    print("\n" + "=" * 60)
     print("Saving CSVs")
-    print("=" * 60)
-
+    
     brand_agg.to_csv(PROCESSED_DIR / "sephora_brand_health.csv", index=False)
     print(f"  -> sephora_brand_health.csv ({len(brand_agg)} brands)")
 
@@ -532,16 +486,10 @@ def run_pipeline():
     fig_overview.write_html(OUTPUT_DIR / "sephora_brand_health_overview.html")
     print(f"  -> {OUTPUT_DIR}/sephora_brand_health_overview.html")
 
-    print("\n" + "=" * 60)
     print("Pipeline complete. In a notebook, call show_dashboard()")
-    print("=" * 60)
 
 
-# ############################################################
-#
 #  DASHBOARD FUNCTIONS (work on import — load from CSVs)
-#
-# ############################################################
 
 def _build_overview(brand_agg):
     """Build the brand health overview scatter."""
@@ -866,8 +814,5 @@ def show_dashboard():
         build_brand_dashboard(brands[0]).show()
 
 
-# ============================================================
-# Script entry point
-# ============================================================
 if __name__ == "__main__":
     run_pipeline()
