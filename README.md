@@ -359,6 +359,51 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │       └── ulta_scraped_brand_slugs.txt
 ├── notebooks/
 │   ├── comparative/
+│   │   ├── outputs/
+│   │   │   ├── 3.1_biplot.png
+│   │   │   ├── 3.1_cross_platform_overlay.png
+│   │   │   ├── 3.1_dendrogram_sephora.png
+│   │   │   ├── 3.1_dendrogram_ulta.png
+│   │   │   ├── 3.1_dimension_heatmap_sephora.png
+│   │   │   ├── 3.1_dimension_heatmap_ulta.png
+│   │   │   ├── 3.1_perceptual_map.png
+│   │   │   ├── 3.1_price_perception_shift.png
+│   │   │   ├── 3.1_price_perception_zones.png
+│   │   │   ├── 3.1_radar_sephora.png
+│   │   │   ├── 3.1_radar_ulta.png
+│   │   │   ├── 3.1_repositioning_matrix.png
+│   │   │   ├── 3.1_shared_perceptual_space.png
+│   │   │   ├── 3.1_white_space_map.png
+│   │   │   ├── 3.1_whitespace_candidates.png
+│   │   │   ├── 3.2_archetype_by_price_tier.png
+│   │   │   ├── 3.2_crossplatform_archetype.png
+│   │   │   ├── 3.2_expectation_management.png
+│   │   │   ├── 3.2_fragility_map.png
+│   │   │   ├── 3.2_granger_causality.png
+│   │   │   ├── 3.2_price_deviation_velocity.png
+│   │   │   ├── 3.2_price_perception_zones.png
+│   │   │   ├── 3.2_price_sensitivity_divergence.png
+│   │   │   ├── 3.2_segment_sensitivity_sephora.png
+│   │   │   ├── 3.2_segment_sensitivity_ulta.png
+│   │   │   ├── 3.2_sensitivity_distributions.png
+│   │   │   ├── 3.2_shock_response.png
+│   │   │   ├── 3.2_spillover_event_study.png
+│   │   │   ├── 3.2_strategy_matrix.png
+│   │   │   ├── 3.2_value_communication_sephora.png
+│   │   │   ├── 3.2_value_communication_ulta.png
+│   │   │   ├── 3.3_did_estimates.png
+│   │   │   ├── 3.3_event_study_coefficients.png
+│   │   │   ├── 3.3_price_reputation_interaction.png
+│   │   │   ├── 3.3_recovery_trajectories.png
+│   │   │   ├── 3.3_roi_matrix_sephora.png
+│   │   │   ├── 3.3_roi_matrix_ulta.png
+│   │   │   └── 3.3_spillover_did.png
+│   │   ├── 3-1_combined_perceptual_map.ipynb
+│   │   ├── 3-1_competitive_positioning.ipynb
+│   │   ├── 3-2_coss_retailer_simulations.ipynb
+│   │   ├── 3-2_perceived_value.ipynb
+│   │   ├── 3-3_causal_attribution.ipynb
+│   │   └── 3-4_convergent_strategic_recommendation.ipynb
 │   ├── independent/
 │   │   ├── outputs/
 │   │   │   ├── sephora_segmentation/
@@ -401,6 +446,10 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   │   └── ulta_sentiment.ipynb
 │   └── joint/
 │       ├── outputs/
+│       │   ├── 2.1_product_graph_brand_networrk.png
+│       │   ├── 2.1_product_graph_category_heatmap.png
+│       │   ├── 2.1_product_graph_coverage.png
+│       │   ├── 2.1_product_graph_price_delta.png
 │       │   ├── 2.2_brand_consistency.png
 │       │   ├── 2.2_segment_divergence.png
 │       │   ├── 2.2_segment_flow.png
@@ -417,12 +466,11 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │       │   ├── 2.4_price_tier_analysis.png
 │       │   ├── 2.4_price_vs_experience_delta.png
 │       │   ├── 2.4_price_vs_value_scatter.png
-│       │   ├── 2.4_value_efficiency.png
-│       │   └── product_graph_fig.png
-│       ├── matched_segmentation.ipynb
-│       ├── perceived_value.ipynb
-│       ├── product_graph.ipynb
-│       └── setiment_gap.ipynb
+│       │   └── 2.4_value_efficiency.png
+│       ├── 2-1_product_graph.ipynb
+│       ├── 2-2_matched_segmentation.ipynb
+│       ├── 2-3_setiment_gap.ipynb
+│       └── 2-4_perceived_value.ipynb
 ├── src/
 │   ├── __pycache__/
 │   ├── __init__.py
