@@ -12,8 +12,10 @@ Usage:
     python src/ulta_sentiment.py
 
   As import (dashboard only, loads from pre-built CSVs):
-    from ulta_sentiment import show_dashboard
-    show_dashboard()
+    from ulta_sentiment import show_dashboard          # Jupyter notebook (interactive dropdowns)
+    from ulta_sentiment import show_overview           # Jupyter notebook (overview scatter only)
+    from ulta_sentiment import write_brand_html        # browser — single brand + segment
+    from ulta_sentiment import write_all_brand_htmls   # browser — all brands × segments + index page
 
 Pipeline (Steps 1–9, runs via run_pipeline()):
   1. Text preprocessing & review filtering
@@ -24,10 +26,17 @@ Pipeline (Steps 1–9, runs via run_pipeline()):
   6. Delighters vs. disappointers per brand
   7. Complaint concentration analysis
   8. Price/value perception diagnostics
-  9. Brand-level aggregation → CSVs (with verified segmentation)
+  9. Brand-level aggregation → CSVs (with verified segmentation) + overview HTML
 
-Dashboard (Step 10, runs via show_dashboard()):
-  Interactive Plotly + ipywidgets brand toggle × verified toggle.
+Dashboard — Jupyter notebook (Step 10, runs via show_dashboard()):
+  Interactive Plotly + ipywidgets brand dropdown × verified segment toggle.
+  Requires a running Jupyter server; not available in exported HTML.
+
+Dashboard — Browser (Step 10 alternative, runs via write_all_brand_htmls()):
+  Saves one self-contained HTML per brand × segment combination to
+  outputs/brand_dashboards/, plus an index page (ulta_brand_dashboards_index.html)
+  linking all brands with per-brand segment links.
+  No server required — open any file directly in a browser.
 
 Inputs:
   data/processed/Ulta/ulta_products.csv
@@ -43,7 +52,9 @@ Outputs (CSVs):
   data/processed/Ulta/ulta_value_perception.csv
 
 Outputs (HTML):
-  notebooks/independent/outputs/ulta_brand_health_overview.html
+  notebooks/independent/outputs/ulta_brand_health_overview.html        (overview scatter, browser)
+  notebooks/independent/outputs/brand_dashboards/<brand>_<seg>.html    (per-brand × segment, browser)
+  notebooks/independent/outputs/ulta_brand_dashboards_index.html            (index page, browser)
 """
 
 import pandas as pd
@@ -59,9 +70,11 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = _SCRIPT_DIR.parent
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "ulta"
 OUTPUT_DIR = PROJECT_ROOT / "notebooks" / "independent" / "outputs"
+BRAND_DASHBOARD_DIR = OUTPUT_DIR / "brand_dashboards"
 MIN_BRAND_REVIEWS = 30
 N_TOPICS = 12
 MIN_REVIEW_LENGTH = 20
+SEGMENTS = ["all", "verified", "unverified"]
 VALUE_KEYWORDS = [
     "worth", "expensive", "cheap", "overpriced", "price", "value",
     "money", "cost", "pricey", "affordable", "waste", "ripoff",
@@ -114,9 +127,15 @@ def _load_data():
           f"{len(_data['reviews']):,} reviews in {elapsed:.1f}s")
 
 
+def _slug(brand_name, segment=None):
+    """Convert a brand name (and optional segment) to a safe filename slug."""
+    base = re.sub(r"[^\w\-]", "_", brand_name).strip("_")
+    return f"{base}_{segment}" if segment else base
+
+
 # PIPELINE: run_pipeline()
 def run_pipeline():
-    """Run the full Ulta brand health pipeline (Steps 1–9) and save CSVs."""
+    """Run the full Ulta brand health pipeline (Steps 1-9) and save CSVs."""
 
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
     from sklearn.feature_extraction.text import TfidfVectorizer
@@ -175,7 +194,7 @@ def run_pipeline():
     print(f"  Reviews with headlines: {(reviews['clean_headline'].str.len() > 0).sum():,}")
 
     # STEP 2: Sentiment Scoring (VADER — Body + Headline + Combined)
-    print("STEP 2: Sentiment scoring (VADER — body + headline + combined)")
+    print("STEP 2: Sentiment scoring (VADER -- body + headline + combined)")
 
     analyzer = SentimentIntensityAnalyzer()
 
@@ -184,48 +203,40 @@ def run_pipeline():
             return 0.0
         return analyzer.polarity_scores(text)["compound"]
 
-    # Body sentiment
     reviews["sentiment_compound"] = reviews["clean_text"].apply(vader_compound)
-
-    # Headline sentiment (Ulta-specific)
     reviews["headline_sentiment"] = reviews["clean_headline"].apply(vader_compound)
 
-    # Combined: 70% body + 30% headline (headline is more emotionally concentrated)
     has_headline = reviews["clean_headline"].str.len() > 0
-    reviews["combined_sentiment"] = reviews["sentiment_compound"]  # default to body
+    reviews["combined_sentiment"] = reviews["sentiment_compound"]
     reviews.loc[has_headline, "combined_sentiment"] = (
         0.7 * reviews.loc[has_headline, "sentiment_compound"]
         + 0.3 * reviews.loc[has_headline, "headline_sentiment"]
     )
 
-    # Sentiment labels (based on combined)
     reviews["sentiment_label"] = pd.cut(
         reviews["combined_sentiment"],
         bins=[-1.01, -0.05, 0.05, 1.01],
         labels=["negative", "neutral", "positive"],
     )
     reviews["sentiment_intensity"] = reviews["combined_sentiment"].abs()
-
-    # Headline-body divergence
     reviews["headline_body_gap"] = reviews["headline_sentiment"] - reviews["sentiment_compound"]
 
-    print(f"  Body sentiment   — mean: {reviews['sentiment_compound'].mean():.3f}")
-    print(f"  Headline sentiment — mean: {reviews['headline_sentiment'].mean():.3f}")
-    print(f"  Combined sentiment — mean: {reviews['combined_sentiment'].mean():.3f}")
+    print(f"  Body sentiment   -- mean: {reviews['sentiment_compound'].mean():.3f}")
+    print(f"  Headline sentiment -- mean: {reviews['headline_sentiment'].mean():.3f}")
+    print(f"  Combined sentiment -- mean: {reviews['combined_sentiment'].mean():.3f}")
     print(f"  Positive: {(reviews['sentiment_label'] == 'positive').mean():.1%}")
     print(f"  Neutral:  {(reviews['sentiment_label'] == 'neutral').mean():.1%}")
     print(f"  Negative: {(reviews['sentiment_label'] == 'negative').mean():.1%}")
 
-    # Verified vs unverified sentiment
     for seg, mask in [("Verified", reviews["is_verified_buyer"]),
                       ("Unverified", ~reviews["is_verified_buyer"])]:
         if mask.sum() > 0:
-            print(f"  {seg} — n={mask.sum():,}, "
+            print(f"  {seg} -- n={mask.sum():,}, "
                   f"body={reviews.loc[mask, 'sentiment_compound'].mean():.3f}, "
                   f"headline={reviews.loc[mask, 'headline_sentiment'].mean():.3f}, "
                   f"combined={reviews.loc[mask, 'combined_sentiment'].mean():.3f}")
 
-    # STEP 3: Rating–Sentiment Mismatch Detection
+    # STEP 3: Rating-Sentiment Mismatch Detection
     print("STEP 3: Rating-sentiment mismatch detection")
 
     reviews["rating_normalized"] = (reviews["Rating"] - 3) / 2
@@ -248,10 +259,9 @@ def run_pipeline():
     for mt, count in reviews["mismatch_type"].value_counts().items():
         print(f"    {mt}: {count:,} ({count / len(reviews):.1%})")
 
-    # STEP 4: Topic Modeling (NMF on TF-IDF — body + headline)
+    # STEP 4: Topic Modeling (NMF on TF-IDF -- body + headline)
     print(f"STEP 4: Topic modeling (NMF, {N_TOPICS} topics)")
 
-    # Concatenate headline + body for richer topic signal
     reviews["topic_text"] = (
         reviews["clean_headline"].fillna("") + " " + reviews["clean_text"]
     ).str.strip()
@@ -282,14 +292,14 @@ def run_pipeline():
     reviews["dominant_topic"] = W.argmax(axis=1)
     reviews["topic_confidence"] = W.max(axis=1)
 
-    # STEP 5: Topic–Sentiment Linkage (Drivers)
+    # STEP 5: Topic-Sentiment Linkage (Drivers)
     print("STEP 5: Topic-sentiment driver analysis")
 
     print("\n  Global topic-sentiment correlations (combined):")
     for col in topic_cols:
         corr = reviews[col].corr(reviews["combined_sentiment"])
         tid = int(col.split("_")[1])
-        print(f"    Topic {tid}: {corr:+.3f} — {topic_labels[tid][:50]}")
+        print(f"    Topic {tid}: {corr:+.3f} -- {topic_labels[tid][:50]}")
 
     brand_topic_drivers = []
     for brand, bdf in reviews.groupby("brand"):
@@ -308,7 +318,7 @@ def run_pipeline():
             })
 
     topic_drivers_df = pd.DataFrame(brand_topic_drivers)
-    print(f"\n  Brand × topic driver matrix: {topic_drivers_df.shape}")
+    print(f"\n  Brand x topic driver matrix: {topic_drivers_df.shape}")
 
     # STEP 6: Delighters vs. Disappointers
     print("STEP 6: Delighters vs. disappointers")
@@ -388,7 +398,6 @@ def run_pipeline():
     print("STEP 8: Price/value perception diagnostics")
 
     value_pattern = "|".join(VALUE_KEYWORDS)
-    # Check both body and headline for value mentions
     reviews["mentions_value"] = (
         reviews["clean_text"].str.lower().str.contains(value_pattern, regex=True, na=False)
         | reviews["clean_headline"].str.lower().str.contains(value_pattern, regex=True, na=False)
@@ -437,7 +446,6 @@ def run_pipeline():
     print("STEP 9: Brand-level aggregation (all + verified + unverified)")
 
     def aggregate_segment(df, segment_label):
-        """Aggregate review metrics for a subset of reviews."""
         agg = df.groupby("brand").agg(
             n_reviews=("clean_text", "count"),
             n_products=("pd_id", "nunique"),
@@ -469,13 +477,10 @@ def run_pipeline():
 
         agg = agg[agg["n_reviews"] >= MIN_BRAND_REVIEWS].copy()
         agg["verified_segment"] = segment_label
-
         agg["sentiment_polarization"] = agg["pct_positive"] - agg["pct_negative"]
         agg["rating_sentiment_alignment"] = 1 - agg["total_mismatch_rate"]
-
         return agg
 
-    # Build three segments
     agg_all = aggregate_segment(reviews, "all")
     agg_ver = aggregate_segment(reviews[reviews["is_verified_buyer"]], "verified")
     agg_unv = aggregate_segment(reviews[~reviews["is_verified_buyer"]], "unverified")
@@ -487,7 +492,6 @@ def run_pipeline():
     print(f"  Unverified: {len(agg_unv)} brands")
     print(f"  Total rows: {len(brand_agg)}")
 
-    # Merge complaint + value + delighter/disappointer (on "all" segment, then broadcast)
     brand_agg = brand_agg.merge(
         complaint_df[["brand", "n_negative_reviews", "complaint_entropy_normalized",
                       "complaint_concentration_label", "top_complaint_topic",
@@ -557,17 +561,19 @@ def run_pipeline():
     print(f"  -> ulta_value_perception.csv ({len(value_df)} brands)")
 
     # Save overview HTML
-    fig_overview = _build_overview(
-        brand_agg[brand_agg["verified_segment"] == "all"]
-    )
+    fig_overview = _build_overview(brand_agg[brand_agg["verified_segment"] == "all"])
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     fig_overview.write_html(OUTPUT_DIR / "ulta_brand_health_overview.html")
-    print(f"  -> {OUTPUT_DIR}/ulta_brand_health_overview.html")
+    print(f"  -> ulta_brand_health_overview.html")
 
-    print("Pipeline complete. In a notebook, call show_dashboard()")
+    print(
+        "\nPipeline complete."
+        "\n  Notebook (interactive dropdowns): call show_dashboard()"
+        "\n  Browser (per-brand HTML files):   call write_all_brand_htmls()"
+    )
 
 
-#  DASHBOARD FUNCTIONS
+# DASHBOARD FUNCTIONS
 
 def _build_overview(brand_agg):
     """Build the brand health overview scatter."""
@@ -603,7 +609,7 @@ def _build_overview(brand_agg):
     fig.update_layout(
         title="Ulta Brand Health Overview<br>"
               "<sup>Size = review volume | Color = mismatch rate</sup>",
-        xaxis_title="Avg Combined Sentiment (0.7×body + 0.3×headline)",
+        xaxis_title="Avg Combined Sentiment (0.7xbody + 0.3xheadline)",
         yaxis_title="Avg Star Rating",
         template="plotly_white", height=700, width=1100,
     )
@@ -612,7 +618,10 @@ def _build_overview(brand_agg):
 
 def build_brand_dashboard(brand_name, verified_segment="all"):
     """
-    Build a 12-panel brand health dashboard for a single brand.
+    Build a 12-panel brand health dashboard for a single brand and segment.
+    Returns a Plotly Figure -- call .show() in a notebook or
+    .write_html(path) to save as a browser-accessible file.
+    Loads from CSVs if data not already in memory.
 
     Ulta-specific panels vs Sephora:
       - R1C2: Body vs Headline sentiment overlay
@@ -634,20 +643,16 @@ def build_brand_dashboard(brand_name, verified_segment="all"):
     topic_drivers_df = _data["topic_drivers_df"]
     dd_df = _data["dd_df"]
 
-    # Get brand-level row for this segment
     mask = (brand_agg["brand"] == brand_name) & (brand_agg["verified_segment"] == verified_segment)
     if mask.sum() == 0:
-        # Fall back to "all"
         mask = (brand_agg["brand"] == brand_name) & (brand_agg["verified_segment"] == "all")
     b = brand_agg[mask].iloc[0]
 
-    # Filter reviews by brand + verified segment
     br = _data["brand_reviews"].get(brand_name, pd.DataFrame())
     if len(br) > 0 and verified_segment == "verified":
         br = br[br["is_verified_buyer"] == True]
     elif len(br) > 0 and verified_segment == "unverified":
         br = br[br["is_verified_buyer"] == False]
-    # "all" keeps everything
 
     b_drv = topic_drivers_df[topic_drivers_df["brand"] == brand_name].sort_values(
         "correlation_with_sentiment"
@@ -661,12 +666,12 @@ def build_brand_dashboard(brand_name, verified_segment="all"):
             "Body vs Headline Sentiment",
             "Rating vs Sentiment (Mismatch)",
             "Topic Prevalence",
-            "Topic\u2013Sentiment Drivers",
+            "Topic-Sentiment Drivers",
             "Delighters vs Disappointers",
             "Sentiment Over Time",
             "Complaint Concentration",
             "Verified vs Unverified",
-            "Rating\u2013Sentiment Gap",
+            "Rating-Sentiment Gap",
             "Headline vs Body Sentiment",
             "Helpful Votes vs Sentiment",
         ),
@@ -700,13 +705,11 @@ def build_brand_dashboard(brand_name, verified_segment="all"):
     # R1C2: Body vs Headline Sentiment (overlaid histograms)
     fig.add_trace(go.Histogram(
         x=br["sentiment_compound"], nbinsx=25, name="Body",
-        marker_color="rgba(52, 152, 219, 0.5)", showlegend=True,
-        legendgroup="sent",
+        marker_color="rgba(52, 152, 219, 0.5)", showlegend=True, legendgroup="sent",
     ), row=1, col=2)
     fig.add_trace(go.Histogram(
         x=br["headline_sentiment"], nbinsx=25, name="Headline",
-        marker_color="rgba(231, 76, 60, 0.5)", showlegend=True,
-        legendgroup="sent",
+        marker_color="rgba(231, 76, 60, 0.5)", showlegend=True, legendgroup="sent",
     ), row=1, col=2)
 
     # R1C3: Rating vs Sentiment Scatter (Mismatch)
@@ -732,7 +735,7 @@ def build_brand_dashboard(brand_name, verified_segment="all"):
         text=[f"{v:.0%}" for v in tp.values], textposition="outside",
     ), row=2, col=1)
 
-    # R2C2: Topic–Sentiment Drivers
+    # R2C2: Topic-Sentiment Drivers
     if len(b_drv) > 0:
         fig.add_trace(go.Bar(
             y=[f"T{int(r['topic_id'])}" for _, r in b_drv.iterrows()],
@@ -813,7 +816,7 @@ def build_brand_dashboard(brand_name, verified_segment="all"):
                 textposition="outside", showlegend=False,
             ), row=3, col=3)
 
-    # R4C1: Rating–Sentiment Gap
+    # R4C1: Rating-Sentiment Gap
     fig.add_trace(go.Histogram(
         x=br["rating_sentiment_gap"], nbinsx=30,
         marker_color="#8e44ad", showlegend=False, opacity=0.7,
@@ -826,7 +829,6 @@ def build_brand_dashboard(brand_name, verified_segment="all"):
         mode="markers", marker=dict(color="#3498db", size=3, opacity=0.4),
         showlegend=False,
     ), row=4, col=2)
-    # Add diagonal reference line
     fig.add_trace(go.Scatter(
         x=[-1, 1], y=[-1, 1], mode="lines",
         line=dict(color="gray", width=1, dash="dash"),
@@ -892,7 +894,7 @@ def build_brand_dashboard(brand_name, verified_segment="all"):
     fig.update_xaxes(title_text="Sentiment Lift", row=2, col=3)
     fig.update_yaxes(title_text="Combined Sentiment", row=3, col=1)
     fig.update_xaxes(title_text="Avg Combined Sentiment", row=3, col=3)
-    fig.update_xaxes(title_text="Gap (Rating \u2212 Sentiment)", row=4, col=1)
+    fig.update_xaxes(title_text="Gap (Rating - Sentiment)", row=4, col=1)
     fig.update_xaxes(title_text="Body Sentiment", row=4, col=2)
     fig.update_yaxes(title_text="Headline Sentiment", row=4, col=2)
     fig.update_xaxes(title_text="Helpful Votes", row=4, col=3)
@@ -901,8 +903,186 @@ def build_brand_dashboard(brand_name, verified_segment="all"):
     return fig
 
 
+# BROWSER EXPORT FUNCTIONS
+
+def write_brand_html(brand_name, verified_segment="all", output_dir=None):
+    """
+    Save a single brand + segment dashboard as a self-contained HTML file
+    that can be opened in any browser without a running Jupyter server.
+
+    Args:
+        brand_name:       Exact brand name string (must exist in ulta_brand_health.csv).
+        verified_segment: "all", "verified", or "unverified". Defaults to "all".
+        output_dir:       Path to save the file. Defaults to
+                          notebooks/independent/outputs/brand_dashboards/.
+
+    Returns:
+        Path object pointing to the written file.
+
+    Usage:
+        from ulta_sentiment import write_brand_html
+        write_brand_html("Sol de Janeiro")
+        write_brand_html("NARS", verified_segment="verified")
+        write_brand_html("Valentino", verified_segment="all", output_dir="my_reports/")
+    """
+    out = Path(output_dir) if output_dir else BRAND_DASHBOARD_DIR
+    out.mkdir(parents=True, exist_ok=True)
+    fig = build_brand_dashboard(brand_name, verified_segment)
+    path = out / f"{_slug(brand_name, verified_segment)}.html"
+    fig.write_html(str(path), include_plotlyjs="cdn")
+    print(f"  -> {path}")
+    return path
+
+
+def write_all_brand_htmls(output_dir=None, segments=None):
+    """
+    Save a self-contained HTML dashboard for every qualifying brand x segment
+    combination, then generate a linked index page (ulta_brand_dashboards_index.html)
+    listing all brands with links to each segment view.
+    All files can be opened in any browser without a running Jupyter server.
+
+    Args:
+        output_dir: Directory to save brand HTML files. Defaults to
+                    notebooks/independent/outputs/brand_dashboards/.
+                    The index page is always written one level up
+                    (notebooks/independent/outputs/ulta_brand_dashboards_index.html).
+        segments:   List of segments to export. Defaults to ["all", "verified", "unverified"].
+                    Pass ["all"] to export only the full-corpus view.
+
+    Usage:
+        from ulta_sentiment import write_all_brand_htmls
+        write_all_brand_htmls()
+        write_all_brand_htmls(segments=["all"])
+        write_all_brand_htmls(output_dir="my_reports/brands/")
+    """
+    _load_data()
+    brands = _data["dashboard_brands"]
+    segs = segments if segments is not None else SEGMENTS
+    out = Path(output_dir) if output_dir else BRAND_DASHBOARD_DIR
+    out.mkdir(parents=True, exist_ok=True)
+
+    total = len(brands) * len(segs)
+    print(f"Writing {len(brands)} brands x {len(segs)} segments = {total} dashboards to {out}/")
+
+    from collections import defaultdict
+    written = []
+    brand_files = defaultdict(dict)
+    count = 0
+
+    for brand in brands:
+        for seg in segs:
+            count += 1
+            try:
+                path = write_brand_html(brand, seg, output_dir=out)
+                written.append((brand, seg, path.name))
+                brand_files[brand][seg] = path.name
+                if count % 25 == 0:
+                    print(f"  {count}/{total} complete...")
+            except Exception as e:
+                print(f"  WARNING: skipped {brand!r} [{seg}] -- {e}")
+
+    # Build index page
+    index_path = out.parent / "ulta_brand_dashboards_index.html"
+    agg_all = _data["brand_agg"][_data["brand_agg"]["verified_segment"] == "all"].set_index("brand")
+
+    seg_headers = "".join(f"<th>{s.title()}</th>" for s in segs)
+    rows_html = ""
+    for brand in brands:
+        if brand not in brand_files:
+            continue
+        try:
+            row = agg_all.loc[brand]
+            n_rev = f"{int(row['n_reviews']):,}"
+            avg_rat = f"{row['avg_rating']:.2f}"
+            avg_sent = f"{row['avg_sentiment']:.3f}"
+            mismatch = f"{row['total_mismatch_rate']:.1%}"
+            pct_ver = f"{row['pct_verified']:.1%}"
+            vd_label = row.get("value_driver_label", "N/A") or "N/A"
+            cc_label = row.get("complaint_concentration_label", "N/A") or "N/A"
+        except Exception:
+            n_rev, avg_rat, avg_sent, mismatch, pct_ver, vd_label, cc_label = "—", "—", "—", "—", "—", "—", "—"
+
+        primary_file = brand_files[brand].get("all", next(iter(brand_files[brand].values())))
+        seg_links = "".join(
+            f"<td><a href='brand_dashboards/{brand_files[brand][s]}'>{s}</a></td>"
+            if s in brand_files[brand] else "<td>—</td>"
+            for s in segs
+        )
+
+        rows_html += (
+            f"<tr>"
+            f"<td><a href='brand_dashboards/{primary_file}'>{brand}</a></td>"
+            f"<td>{n_rev}</td>"
+            f"<td>{avg_rat}</td>"
+            f"<td>{avg_sent}</td>"
+            f"<td>{mismatch}</td>"
+            f"<td>{pct_ver}</td>"
+            f"<td>{vd_label}</td>"
+            f"<td>{cc_label}</td>"
+            f"{seg_links}"
+            f"</tr>\n"
+        )
+
+    index_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ulta Brand Health -- Dashboard Index</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; max-width: 1400px; margin: 40px auto; padding: 0 20px; color: #2C3E50; }}
+    h1 {{ color: #2C3E50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px; }}
+    p.subtitle {{ color: #7f8c8d; margin-top: -8px; }}
+    input {{ width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box;
+             border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+    th {{ background: #2C3E50; color: white; padding: 10px; text-align: left; position: sticky; top: 0; }}
+    td {{ padding: 8px 10px; border-bottom: 1px solid #ecf0f1; }}
+    tr:hover td {{ background: #f0f4f8; }}
+    a {{ color: #e74c3c; text-decoration: none; }}
+    a:hover {{ text-decoration: underline; }}
+  </style>
+</head>
+<body>
+  <h1>Ulta Brand Health -- Dashboard Index</h1>
+  <p class="subtitle">{len(brand_files)} brands x {len(segs)} segments &nbsp;|&nbsp; Click a brand name for the full-corpus view, or use segment columns for specific cuts</p>
+  <input type="text" id="search" placeholder="Filter brands..." onkeyup="filterTable()">
+  <table id="brandTable">
+    <thead>
+      <tr>
+        <th>Brand</th>
+        <th>Reviews</th>
+        <th>Avg Rating</th>
+        <th>Avg Sentiment</th>
+        <th>Mismatch Rate</th>
+        <th>Verified %</th>
+        <th>Value Driver</th>
+        <th>Complaint Pattern</th>
+        {seg_headers}
+      </tr>
+    </thead>
+    <tbody>
+{rows_html}    </tbody>
+  </table>
+  <script>
+    function filterTable() {{
+      const q = document.getElementById("search").value.toLowerCase();
+      document.querySelectorAll("#brandTable tbody tr").forEach(row => {{
+        row.style.display = row.cells[0].textContent.toLowerCase().includes(q) ? "" : "none";
+      }});
+    }}
+  </script>
+</body>
+</html>"""
+
+    index_path.write_text(index_html, encoding="utf-8")
+    print(f"\nIndex page written: {index_path}")
+    print(f"Done. {len(written)}/{total} dashboards saved.")
+    return index_path
+
+
 def show_overview():
-    """Show the brand health overview scatter in a notebook."""
+    """Show the brand health overview scatter inline in a notebook."""
     _load_data()
     agg_all = _data["brand_agg"][_data["brand_agg"]["verified_segment"] == "all"]
     fig = _build_overview(agg_all)
@@ -911,8 +1091,11 @@ def show_overview():
 
 def show_dashboard():
     """
-    Launch the interactive Ulta brand health dashboard in a notebook.
-    Two dropdowns: Brand × Verified Segment.
+    Launch the interactive Ulta brand health dashboard in a Jupyter notebook.
+    Two controls: brand dropdown x verified segment toggle.
+    Requires a running Jupyter server with ipywidgets enabled.
+
+    For browser access without a notebook, use write_all_brand_htmls() instead.
 
     Usage:
         from ulta_sentiment import show_dashboard
@@ -923,13 +1106,12 @@ def show_dashboard():
 
     _load_data()
     brands = _data["dashboard_brands"]
-    segments = ["all", "verified", "unverified"]
 
     display(HTML(
         "<h2 style='text-align:center; color:#2C3E50;'>"
         "Ulta Brand Health Dashboard</h2>"
         "<p style='text-align:center; color:#7f8c8d;'>"
-        f"Select from {len(brands)} brands × 3 verified segments. "
+        f"Select from {len(brands)} brands x 3 verified segments. "
         "Dashboard rebuilds on each selection.</p>"
     ))
 

@@ -12,12 +12,18 @@
 # Outputs:
 #   data/processed/ulta_recommendations.csv
 #
-# Notebook usage:
-#   from src.ulta_recommendations import show_dashboard
-#   show_dashboard()
+# Usage:
+#   As script (runs full pipeline):
+#     python src/ulta_recommendations.py
+#
+#   As import (dashboard only, loads from pre-built CSVs):
+#     from src.ulta_recommendations import show_dashboard          # Jupyter notebook (interactive dropdown)
+#     from src.ulta_recommendations import write_product_html      # browser — single product
+#     from src.ulta_recommendations import write_all_product_htmls # browser — all products + index page
 
 import pandas as pd
 import numpy as np
+import re
 import time
 from pathlib import Path
 from sklearn.preprocessing import StandardScaler
@@ -28,6 +34,8 @@ warnings.filterwarnings("ignore")
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent
 PROCESSED_DIR = _PROJECT_ROOT / "data" / "processed" / "Ulta"
+OUTPUT_DIR = _PROJECT_ROOT / "notebooks" / "independent" / "outputs"
+PRODUCT_DASHBOARD_DIR = OUTPUT_DIR / "ulta_product_dashboards"
 MIN_REVIEWS = 20
 TOP_N_SUB = 5
 TOP_N_COMP = 5
@@ -69,6 +77,11 @@ def _load_data():
 
     elapsed = time.time() - t0
     print(f"  Loaded {len(products):,} products in {elapsed:.1f}s")
+
+
+def _slug(text):
+    """Convert a string to a safe filename slug."""
+    return re.sub(r"[^\w\-]", "_", str(text)).strip("_")
 
 
 # FEATURE BLOCKS — ULTA-SPECIFIC
@@ -230,7 +243,7 @@ def _generate_csv(df, sub, comp, trade_up, trade_dn):
 # PIPELINE
 
 def run_pipeline():
-    """Run full computation pipeline. Saves CSV. Then use show_dashboard()."""
+    """Run full computation pipeline. Saves CSV. Then use show_dashboard() or write_all_product_htmls()."""
     print("█" * 70)
     print("  ULTA — RECOMMENDATION SYSTEM (1.3)")
     print("█" * 70)
@@ -303,9 +316,12 @@ def run_pipeline():
     csv_path = PROCESSED_DIR / "ulta_recommendations.csv"
     recs_df.to_csv(csv_path, index=False)
     print(f"\n  ✓ Saved: {csv_path}  ({recs_df.shape})")
-    print(f"\n  Dashboard:")
+    print(f"\n  Notebook (interactive dropdown):")
     print(f"    from src.ulta_recommendations import show_dashboard")
     print(f"    show_dashboard()")
+    print(f"\n  Browser (per-product HTML files):")
+    print(f"    from src.ulta_recommendations import write_all_product_htmls")
+    print(f"    write_all_product_htmls()")
     print(f"\n{'█'*70}\n")
 
 
@@ -315,7 +331,9 @@ def build_product_dashboard(product_id):
     """
     Build a multi-panel product recommendation dashboard for a single Ulta product.
     Includes verification provenance context.
-    Returns a plotly Figure.
+    Returns a Plotly Figure — call .show() in a notebook or
+    .write_html(path) to save as a browser-accessible file.
+    Loads from CSVs if data not already in memory.
     """
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -358,7 +376,6 @@ def build_product_dashboard(product_id):
     src_vb = float(row.get("pct_verified_buyer", 0) or 0)
     src_disc = float(row.get("pct_has_disclosure", 0) or 0)
 
-    # Helper: extract data, short labels + hover
     def _extract(prefix, top_n):
         items = []
         for rk in range(1, top_n + 1):
@@ -571,13 +588,209 @@ def build_product_dashboard(product_id):
     return fig
 
 
+# BROWSER EXPORT FUNCTIONS
+
+def write_product_html(product_id, output_dir=None):
+    """
+    Save a single product's recommendation dashboard as a self-contained HTML
+    file that can be opened in any browser without a running Jupyter server.
+    Verification provenance badges and bar colors are preserved in the export.
+
+    Args:
+        product_id:   Product ID string (must exist in ulta_recommendations.csv).
+        output_dir:   Path to save the file. Defaults to
+                      notebooks/independent/outputs/ulta_product_dashboards/.
+
+    Returns:
+        Path object pointing to the written file.
+
+    Usage:
+        from src.ulta_recommendations import write_product_html
+        write_product_html("P12345678")
+        write_product_html("P12345678", output_dir="my_reports/")
+    """
+    _load_data()
+    out = Path(output_dir) if output_dir else PRODUCT_DASHBOARD_DIR
+    out.mkdir(parents=True, exist_ok=True)
+
+    recs = _data["recs"]
+    match = recs[recs["product_id"].astype(str) == str(product_id)]
+    if len(match) > 0:
+        r = match.iloc[0]
+        brand = _slug(str(r.get("brand", "")))
+        name = _slug(str(r.get("product_name", product_id))[:40])
+        filename = f"{brand}_{name}_{_slug(str(product_id))}.html"
+    else:
+        filename = f"{_slug(str(product_id))}.html"
+
+    fig = build_product_dashboard(product_id)
+    path = out / filename
+    fig.write_html(str(path), include_plotlyjs="cdn")
+    print(f"  -> {path}")
+    return path
+
+
+def write_all_product_htmls(output_dir=None):
+    """
+    Save a self-contained HTML dashboard for every product in the Ulta catalog,
+    then generate a linked index page (ulta_product_dashboards_index.html) listing
+    all products with their key metrics including verification provenance. All files
+    can be opened in any browser without a running Jupyter server.
+
+    Note: the Ulta catalog is large. This function may take several minutes to
+    complete. For a targeted subset, call write_product_html() directly for each
+    product ID of interest.
+
+    Args:
+        output_dir:   Directory to save product HTML files. Defaults to
+                      notebooks/independent/outputs/ulta_product_dashboards/.
+                      The index page is always written one level up
+                      (notebooks/independent/outputs/ulta_product_dashboards_index.html).
+
+    Usage:
+        from src.ulta_recommendations import write_all_product_htmls
+        write_all_product_htmls()
+        write_all_product_htmls(output_dir="my_reports/ulta_products/")
+    """
+    _load_data()
+    recs = _data["recs"]
+    out = Path(output_dir) if output_dir else PRODUCT_DASHBOARD_DIR
+    out.mkdir(parents=True, exist_ok=True)
+
+    total = len(recs)
+    print(f"Writing {total:,} product dashboards to {out}/")
+    print("This may take several minutes for the full Ulta catalog.")
+
+    written = []
+    for i, (_, rec_row) in enumerate(recs.iterrows(), 1):
+        pid = str(rec_row["product_id"])
+        try:
+            path = write_product_html(pid, output_dir=out)
+            written.append((rec_row, path.name))
+        except Exception as e:
+            print(f"  WARNING: skipped {pid!r} — {e}")
+        if i % 100 == 0:
+            print(f"  {i:,}/{total:,} complete...")
+
+    # Build index page
+    index_path = out.parent / "ulta_product_dashboards_index.html"
+
+    rows_html = ""
+    for rec_row, filename in written:
+        brand = str(rec_row.get("brand", ""))
+        name = str(rec_row.get("product_name", ""))
+        category = str(rec_row.get("category", ""))
+        try:
+            price = f"${float(rec_row.get('price', 0) or 0):.0f}"
+            rating = f"{float(rec_row.get('avg_rating', 0) or 0):.2f}"
+            sentiment = f"{float(rec_row.get('avg_sentiment', 0) or 0):.3f}"
+            reviews = f"{int(rec_row.get('review_count', 0) or 0):,}"
+            vb = float(rec_row.get("pct_verified_buyer", 0) or 0)
+            disc = float(rec_row.get("pct_has_disclosure", 0) or 0)
+            if disc > 0.20:
+                verif_label = f"Seeded ({disc:.0%})"
+                verif_color = "#e67e22"
+            elif vb > 0.20:
+                verif_label = f"Verified ({vb:.0%})"
+                verif_color = "#27ae60"
+            else:
+                verif_label = "Low"
+                verif_color = "#3498db"
+        except Exception:
+            price = rating = sentiment = reviews = "—"
+            verif_label = "—"
+            verif_color = "#aaa"
+
+        rows_html += (
+            f"<tr>"
+            f"<td><a href='ulta_product_dashboards/{filename}'>{brand}</a></td>"
+            f"<td>{name}</td>"
+            f"<td>{category}</td>"
+            f"<td>{price}</td>"
+            f"<td>{rating}</td>"
+            f"<td>{sentiment}</td>"
+            f"<td>{reviews}</td>"
+            f"<td><span style='color:{verif_color}; font-weight:bold;'>{verif_label}</span></td>"
+            f"</tr>\n"
+        )
+
+    index_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ulta Recommendations — Product Index</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; max-width: 1400px; margin: 40px auto; padding: 0 20px; color: #2C3E50; }}
+    h1 {{ color: #880e4f; border-bottom: 2px solid #880e4f; padding-bottom: 10px; }}
+    p.subtitle {{ color: #7f8c8d; margin-top: -8px; }}
+    p.legend {{ font-size: 12px; }}
+    input {{ width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box;
+             border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+    th {{ background: #880e4f; color: white; padding: 10px; text-align: left; position: sticky; top: 0; }}
+    td {{ padding: 8px 10px; border-bottom: 1px solid #ecf0f1; }}
+    tr:hover td {{ background: #fdf0f5; }}
+    a {{ color: #880e4f; text-decoration: none; font-weight: bold; }}
+    a:hover {{ text-decoration: underline; }}
+  </style>
+</head>
+<body>
+  <h1>Ulta Recommendations — Product Index</h1>
+  <p class="subtitle">
+    {len(written):,} products &nbsp;|&nbsp;
+    Click any brand name to open its full recommendation dashboard
+  </p>
+  <p class="legend">
+    Verification:
+    <span style="color:#27ae60; font-weight:bold;">■ Organic Verified</span> &nbsp;
+    <span style="color:#e67e22; font-weight:bold;">■ Seeded (&gt;20% disclosure)</span> &nbsp;
+    <span style="color:#3498db; font-weight:bold;">■ Low Verification</span>
+  </p>
+  <input type="text" id="search" placeholder="Filter by brand, product, or category..." onkeyup="filterTable()">
+  <table id="productTable">
+    <thead>
+      <tr>
+        <th>Brand</th>
+        <th>Product</th>
+        <th>Category</th>
+        <th>Price</th>
+        <th>Avg Rating</th>
+        <th>Avg Sentiment</th>
+        <th>Reviews</th>
+        <th>Verification</th>
+      </tr>
+    </thead>
+    <tbody>
+{rows_html}    </tbody>
+  </table>
+  <script>
+    function filterTable() {{
+      const q = document.getElementById("search").value.toLowerCase();
+      document.querySelectorAll("#productTable tbody tr").forEach(row => {{
+        const text = Array.from(row.cells).slice(0, 3).map(c => c.textContent).join(" ").toLowerCase();
+        row.style.display = text.includes(q) ? "" : "none";
+      }});
+    }}
+  </script>
+</body>
+</html>"""
+
+    index_path.write_text(index_html, encoding="utf-8")
+    print(f"\nIndex page written: {index_path}")
+    print(f"Done. {len(written):,}/{total:,} product dashboards saved.")
+    return index_path
+
+
 # DASHBOARD: show_dashboard() — ipywidgets dropdown
 
 def show_dashboard():
     """
-    Launch interactive product recommendation dashboard in a notebook.
+    Launch interactive product recommendation dashboard in a Jupyter notebook.
     Dropdown toggles between ALL Ulta products.
-    Dashboard rebuilds on each selection.
+    Requires a running Jupyter server with ipywidgets enabled.
+
+    For browser access without a notebook, use write_all_product_htmls() instead.
 
     Usage:
         from src.ulta_recommendations import show_dashboard

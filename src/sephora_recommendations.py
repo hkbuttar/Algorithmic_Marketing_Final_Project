@@ -1,7 +1,5 @@
 # sephora_recommendations.py
-# ═══════════════════════════════════════════════════════════════════════════════
 # 1.3 — Sephora Item-to-Item Marketing Recommendation System
-# ═══════════════════════════════════════════════════════════════════════════════
 #
 # Three recommendation intents:
 #   1. Close Substitutes    — same need, similar perception
@@ -15,12 +13,18 @@
 # Outputs:
 #   data/processed/Sephora/sephora_recommendations.csv
 #
-# Notebook usage:
-#   from src.sephora_recommendations import show_dashboard
-#   show_dashboard()
+# Usage:
+#   As script (runs full pipeline):
+#     python src/sephora_recommendations.py
+#
+#   As import (dashboard only, loads from pre-built CSVs):
+#     from src.sephora_recommendations import show_dashboard         # Jupyter notebook (interactive dropdown)
+#     from src.sephora_recommendations import write_product_html     # browser — single product
+#     from src.sephora_recommendations import write_all_product_htmls # browser — all products + index page
 
 import pandas as pd
 import numpy as np
+import re
 import time
 from pathlib import Path
 from sklearn.preprocessing import StandardScaler
@@ -31,6 +35,8 @@ warnings.filterwarnings("ignore")
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent
 PROCESSED_DIR = _PROJECT_ROOT / "data" / "processed" / "Sephora"
+OUTPUT_DIR = _PROJECT_ROOT / "notebooks" / "independent" / "outputs"
+PRODUCT_DASHBOARD_DIR = OUTPUT_DIR / "product_dashboards"
 MIN_REVIEWS = 20
 TOP_N_SUB = 5
 TOP_N_COMP = 5
@@ -73,6 +79,11 @@ def _load_data():
 
     elapsed = time.time() - t0
     print(f"  Loaded {len(products):,} products in {elapsed:.1f}s")
+
+
+def _slug(text):
+    """Convert a string to a safe filename slug."""
+    return re.sub(r"[^\w\-]", "_", str(text)).strip("_")
 
 
 # FEATURE BLOCKS & SIMILARITY (for run_pipeline)
@@ -214,7 +225,7 @@ def _generate_csv(df, sub, comp, trade_up, trade_dn):
 # PIPELINE
 
 def run_pipeline():
-    """Run full computation pipeline. Saves CSV. Then use show_dashboard()."""
+    """Run full computation pipeline. Saves CSV. Then use show_dashboard() or write_all_product_htmls()."""
     print("█" * 70)
     print("  SEPHORA — RECOMMENDATION SYSTEM (1.3)")
     print("█" * 70)
@@ -273,9 +284,12 @@ def run_pipeline():
     csv_path = PROCESSED_DIR / "sephora_recommendations.csv"
     recs_df.to_csv(csv_path, index=False)
     print(f"\n  ✓ Saved: {csv_path}  ({recs_df.shape})")
-    print(f"\n  Dashboard:")
+    print(f"\n  Notebook (interactive dropdown):")
     print(f"    from src.sephora_recommendations import show_dashboard")
     print(f"    show_dashboard()")
+    print(f"\n  Browser (per-product HTML files):")
+    print(f"    from src.sephora_recommendations import write_all_product_htmls")
+    print(f"    write_all_product_htmls()")
     print(f"\n{'█'*70}\n")
 
 
@@ -284,7 +298,9 @@ def run_pipeline():
 def build_product_dashboard(product_id):
     """
     Build a multi-panel product recommendation dashboard for a single product.
-    Returns a plotly Figure. Loads from CSVs if data not already in memory.
+    Returns a Plotly Figure — call .show() in a notebook or
+    .write_html(path) to save as a browser-accessible file.
+    Loads from CSVs if data not already in memory.
     """
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -326,7 +342,6 @@ def build_product_dashboard(product_id):
     src_price = float(row.get("price", 0) or 0)
     src_sent = float(row.get("avg_sentiment", 0) or 0)
 
-    # ── Helper: extract data, build short labels + hover ────────────────
     def _extract(prefix, top_n):
         items = []
         for rk in range(1, top_n + 1):
@@ -342,7 +357,6 @@ def build_product_dashboard(product_id):
                 rating=float(row.get(f"{prefix}_{rk}_rating", 0) or 0),
                 reviews=int(row.get(f"{prefix}_{rk}_reviews", 0) or 0),
             ))
-        # Short label: "#1 Brand" — hover has everything
         short = [f"#{i+1} {it['brand'][:18]}" for i, it in enumerate(items)]
         hover = [
             f"<b>{it['brand']}</b><br>{it['name']}<br>"
@@ -353,7 +367,7 @@ def build_product_dashboard(product_id):
         ]
         return items, short, hover
 
-    #Substitutes (row 1)
+    # Substitutes (row 1)
     items, short, hover = _extract("sub", TOP_N_SUB)
     if items:
         fig.add_trace(go.Bar(
@@ -380,7 +394,6 @@ def build_product_dashboard(product_id):
     # Complements (row 2)
     items, short, hover = _extract("comp", TOP_N_COMP)
     if items:
-        # Use category in short label instead of brand
         short_c = [f"#{i+1} {it['cat'][:20]}" for i, it in enumerate(items)]
         fig.add_trace(go.Bar(
             y=short_c[::-1], x=[it["price"] for it in items][::-1], orientation="h",
@@ -505,13 +518,187 @@ def build_product_dashboard(product_id):
     return fig
 
 
+# BROWSER EXPORT FUNCTIONS
+
+def write_product_html(product_id, output_dir=None):
+    """
+    Save a single product's recommendation dashboard as a self-contained HTML
+    file that can be opened in any browser without a running Jupyter server.
+
+    Args:
+        product_id:   Product ID string (must exist in sephora_recommendations.csv).
+        output_dir:   Path to save the file. Defaults to
+                      notebooks/independent/outputs/product_dashboards/.
+
+    Returns:
+        Path object pointing to the written file.
+
+    Usage:
+        from src.sephora_recommendations import write_product_html
+        write_product_html("P12345678")
+        write_product_html("P12345678", output_dir="my_reports/")
+    """
+    _load_data()
+    out = Path(output_dir) if output_dir else PRODUCT_DASHBOARD_DIR
+    out.mkdir(parents=True, exist_ok=True)
+
+    # Look up brand and name for a readable filename
+    recs = _data["recs"]
+    match = recs[recs["product_id"].astype(str) == str(product_id)]
+    if len(match) > 0:
+        r = match.iloc[0]
+        brand = _slug(str(r.get("brand", "")))
+        name = _slug(str(r.get("product_name", product_id))[:40])
+        filename = f"{brand}_{name}_{_slug(str(product_id))}.html"
+    else:
+        filename = f"{_slug(str(product_id))}.html"
+
+    fig = build_product_dashboard(product_id)
+    path = out / filename
+    fig.write_html(str(path), include_plotlyjs="cdn")
+    print(f"  -> {path}")
+    return path
+
+
+def write_all_product_htmls(output_dir=None):
+    """
+    Save a self-contained HTML dashboard for every product in the catalog,
+    then generate a linked index page (sephora_product_dashboards_index.html) listing
+    all products with their key metrics. All files can be opened in any browser
+    without a running Jupyter server.
+
+    Note: the Sephora catalog is large. This function may take several minutes
+    to complete. For a targeted subset, call write_product_html() directly for
+    each product ID of interest.
+
+    Args:
+        output_dir:   Directory to save product HTML files. Defaults to
+                      notebooks/independent/outputs/product_dashboards/.
+                      The index page is always written one level up
+                      (notebooks/independent/outputs/sephora_product_dashboards_index.html).
+
+    Usage:
+        from src.sephora_recommendations import write_all_product_htmls
+        write_all_product_htmls()
+        write_all_product_htmls(output_dir="my_reports/products/")
+    """
+    _load_data()
+    recs = _data["recs"]
+    out = Path(output_dir) if output_dir else PRODUCT_DASHBOARD_DIR
+    out.mkdir(parents=True, exist_ok=True)
+
+    total = len(recs)
+    print(f"Writing {total:,} product dashboards to {out}/")
+    print("This may take several minutes for the full Sephora catalog.")
+
+    written = []
+    for i, (_, rec_row) in enumerate(recs.iterrows(), 1):
+        pid = str(rec_row["product_id"])
+        try:
+            path = write_product_html(pid, output_dir=out)
+            written.append((rec_row, path.name))
+        except Exception as e:
+            print(f"  WARNING: skipped {pid!r} — {e}")
+        if i % 100 == 0:
+            print(f"  {i:,}/{total:,} complete...")
+
+    # Build index page
+    index_path = out.parent / "sephora_product_dashboards_index.html"
+
+    rows_html = ""
+    for rec_row, filename in written:
+        brand = str(rec_row.get("brand", ""))
+        name = str(rec_row.get("product_name", ""))
+        category = str(rec_row.get("category", ""))
+        try:
+            price = f"${float(rec_row.get('price', 0) or 0):.0f}"
+            rating = f"{float(rec_row.get('avg_rating', 0) or 0):.2f}"
+            sentiment = f"{float(rec_row.get('avg_sentiment', 0) or 0):.3f}"
+            reviews = f"{int(rec_row.get('review_count', 0) or 0):,}"
+        except Exception:
+            price = rating = sentiment = reviews = "—"
+
+        rows_html += (
+            f"<tr>"
+            f"<td><a href='product_dashboards/{filename}'>{brand}</a></td>"
+            f"<td>{name}</td>"
+            f"<td>{category}</td>"
+            f"<td>{price}</td>"
+            f"<td>{rating}</td>"
+            f"<td>{sentiment}</td>"
+            f"<td>{reviews}</td>"
+            f"</tr>\n"
+        )
+
+    index_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sephora Recommendations — Product Index</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; max-width: 1300px; margin: 40px auto; padding: 0 20px; color: #2C3E50; }}
+    h1 {{ color: #2C3E50; border-bottom: 2px solid #2d6a4f; padding-bottom: 10px; }}
+    p.subtitle {{ color: #7f8c8d; margin-top: -8px; }}
+    input {{ width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box;
+             border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+    th {{ background: #2C3E50; color: white; padding: 10px; text-align: left; position: sticky; top: 0; }}
+    td {{ padding: 8px 10px; border-bottom: 1px solid #ecf0f1; }}
+    tr:hover td {{ background: #f0f4f8; }}
+    a {{ color: #2d6a4f; text-decoration: none; font-weight: bold; }}
+    a:hover {{ text-decoration: underline; }}
+  </style>
+</head>
+<body>
+  <h1>Sephora Recommendations — Product Index</h1>
+  <p class="subtitle">
+    {len(written):,} products &nbsp;|&nbsp;
+    Click any brand name to open its full recommendation dashboard
+  </p>
+  <input type="text" id="search" placeholder="Filter by brand, product, or category..." onkeyup="filterTable()">
+  <table id="productTable">
+    <thead>
+      <tr>
+        <th>Brand</th>
+        <th>Product</th>
+        <th>Category</th>
+        <th>Price</th>
+        <th>Avg Rating</th>
+        <th>Avg Sentiment</th>
+        <th>Reviews</th>
+      </tr>
+    </thead>
+    <tbody>
+{rows_html}    </tbody>
+  </table>
+  <script>
+    function filterTable() {{
+      const q = document.getElementById("search").value.toLowerCase();
+      document.querySelectorAll("#productTable tbody tr").forEach(row => {{
+        const text = Array.from(row.cells).slice(0, 3).map(c => c.textContent).join(" ").toLowerCase();
+        row.style.display = text.includes(q) ? "" : "none";
+      }});
+    }}
+  </script>
+</body>
+</html>"""
+
+    index_path.write_text(index_html, encoding="utf-8")
+    print(f"\nIndex page written: {index_path}")
+    print(f"Done. {len(written):,}/{total:,} product dashboards saved.")
+    return index_path
+
+
 # DASHBOARD: show_dashboard() — ipywidgets dropdown
 
 def show_dashboard():
     """
-    Launch interactive product recommendation dashboard in a notebook.
+    Launch interactive product recommendation dashboard in a Jupyter notebook.
     Dropdown toggles between ALL Sephora products.
-    Dashboard rebuilds on each selection.
+    Requires a running Jupyter server with ipywidgets enabled.
+
+    For browser access without a notebook, use write_all_product_htmls() instead.
 
     Usage:
         from src.sephora_recommendations import show_dashboard

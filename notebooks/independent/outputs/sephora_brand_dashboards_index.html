@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sephora Brand Health — Dashboard Index</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1200px; margin: 40px auto; padding: 0 20px; color: #2C3E50; }
+    h1 { color: #2C3E50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+    p.subtitle { color: #7f8c8d; margin-top: -8px; }
+    input { width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box;
+             border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #2C3E50; color: white; padding: 10px; text-align: left; position: sticky; top: 0; }
+    td { padding: 8px 10px; border-bottom: 1px solid #ecf0f1; }
+    tr:hover td { background: #f0f4f8; }
+    a { color: #3498db; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>Sephora Brand Health — Dashboard Index</h1>
+  <p class="subtitle">304 brands &nbsp;|&nbsp; Click any brand name to open its full 12-panel dashboard</p>
+  <input type="text" id="search" placeholder="Filter brands..." onkeyup="filterTable()">
+  <table id="brandTable">
+    <thead>
+      <tr>
+        <th>Brand</th>
+        <th>Reviews</th>
+        <th>Avg Rating</th>
+        <th>Avg Sentiment</th>
+        <th>Mismatch Rate</th>
+        <th>Value Driver</th>
+        <th>Complaint Pattern</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr><td><a href='brand_dashboards/PAT_McGRATH_LABS.html'>PAT McGRATH LABS</a></td><td>2,443</td><td>4.20</td><td>0.693</td><td>14.9%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Urban_Decay.html'>Urban Decay</a></td><td>1,944</td><td>4.16</td><td>0.698</td><td>14.8%</td><td>mild_price_concern</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Yves_Saint_Laurent.html'>Yves Saint Laurent</a></td><td>1,895</td><td>4.42</td><td>0.741</td><td>11.3%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Sol_de_Janeiro.html'>Sol de Janeiro</a></td><td>1,792</td><td>4.37</td><td>0.718</td><td>11.2%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Olaplex.html'>Olaplex</a></td><td>1,751</td><td>4.25</td><td>0.605</td><td>13.1%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Murad.html'>Murad</a></td><td>1,726</td><td>4.27</td><td>0.578</td><td>12.7%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Anastasia_Beverly_Hills.html'>Anastasia Beverly Hills</a></td><td>1,706</td><td>4.06</td><td>0.609</td><td>15.6%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/IGK.html'>IGK</a></td><td>1,693</td><td>4.18</td><td>0.674</td><td>17.0%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/MERIT.html'>MERIT</a></td><td>1,666</td><td>4.23</td><td>0.712</td><td>14.0%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Westman_Atelier.html'>Westman Atelier</a></td><td>1,664</td><td>4.27</td><td>0.735</td><td>13.3%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Kate_Somerville.html'>Kate Somerville</a></td><td>1,646</td><td>4.29</td><td>0.620</td><td>13.4%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/ILIA.html'>ILIA</a></td><td>1,645</td><td>4.21</td><td>0.701</td><td>12.5%</td><td>price_driven_negativity</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Skinfix.html'>Skinfix</a></td><td>1,637</td><td>4.37</td><td>0.684</td><td>11.2%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Mizani.html'>Mizani</a></td><td>1,636</td><td>4.41</td><td>0.767</td><td>12.3%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Vegamour.html'>Vegamour</a></td><td>1,621</td><td>4.28</td><td>0.691</td><td>11.7%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/MAKEUP_BY_MARIO.html'>MAKEUP BY MARIO</a></td><td>1,608</td><td>4.39</td><td>0.753</td><td>10.6%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/HAUS_LABS_BY_LADY_GAGA.html'>HAUS LABS BY LADY GAGA</a></td><td>1,577</td><td>3.97</td><td>0.616</td><td>19.9%</td><td>price_driven_negativity</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Biossance.html'>Biossance</a></td><td>1,572</td><td>4.33</td><td>0.690</td><td>12.8%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/OLEHENRIKSEN.html'>OLEHENRIKSEN</a></td><td>1,535</td><td>3.88</td><td>0.550</td><td>18.8%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Virtue.html'>Virtue</a></td><td>1,489</td><td>4.47</td><td>0.758</td><td>9.9%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Nécessaire.html'>Nécessaire</a></td><td>1,487</td><td>4.37</td><td>0.710</td><td>10.9%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/stila.html'>stila</a></td><td>1,482</td><td>4.13</td><td>0.639</td><td>16.4%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Drybar.html'>Drybar</a></td><td>1,477</td><td>3.89</td><td>0.591</td><td>18.6%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Versace.html'>Versace</a></td><td>1,446</td><td>4.34</td><td>0.705</td><td>13.8%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Drunk_Elephant.html'>Drunk Elephant</a></td><td>1,434</td><td>4.14</td><td>0.601</td><td>15.6%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Benefit_Cosmetics.html'>Benefit Cosmetics</a></td><td>1,430</td><td>4.08</td><td>0.587</td><td>15.9%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Too_Faced.html'>Too Faced</a></td><td>1,420</td><td>4.15</td><td>0.631</td><td>15.7%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Origins.html'>Origins</a></td><td>1,418</td><td>4.21</td><td>0.665</td><td>14.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Estée_Lauder.html'>Estée Lauder</a></td><td>1,372</td><td>4.28</td><td>0.726</td><td>12.6%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Tatcha.html'>Tatcha</a></td><td>1,371</td><td>4.02</td><td>0.565</td><td>18.5%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/MAKE_UP_FOR_EVER.html'>MAKE UP FOR EVER</a></td><td>1,363</td><td>4.31</td><td>0.706</td><td>12.3%</td><td>mild_price_concern</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Rare_Beauty_by_Selena_Gomez.html'>Rare Beauty by Selena Gomez</a></td><td>1,361</td><td>4.05</td><td>0.655</td><td>16.2%</td><td>price_driven_negativity</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Sunday_Riley.html'>Sunday Riley</a></td><td>1,359</td><td>4.10</td><td>0.542</td><td>16.1%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/INNBEAUTY_PROJECT.html'>INNBEAUTY PROJECT</a></td><td>1,354</td><td>4.27</td><td>0.649</td><td>12.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Moroccanoil.html'>Moroccanoil</a></td><td>1,353</td><td>4.35</td><td>0.701</td><td>11.0%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/La_Mer.html'>La Mer</a></td><td>1,334</td><td>4.20</td><td>0.689</td><td>15.8%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Supergoop.html'>Supergoop!</a></td><td>1,310</td><td>3.78</td><td>0.540</td><td>20.3%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Glossier.html'>Glossier</a></td><td>1,306</td><td>4.22</td><td>0.721</td><td>15.9%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Prada.html'>Prada</a></td><td>1,305</td><td>4.41</td><td>0.766</td><td>11.3%</td><td>mild_price_concern</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/PATRICK_TA.html'>PATRICK TA</a></td><td>1,304</td><td>3.79</td><td>0.616</td><td>20.8%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Kosas.html'>Kosas</a></td><td>1,300</td><td>3.48</td><td>0.407</td><td>22.8%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/St__Tropez.html'>St. Tropez</a></td><td>1,296</td><td>4.35</td><td>0.733</td><td>12.3%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Maison_Margiela.html'>Maison Margiela</a></td><td>1,293</td><td>4.20</td><td>0.716</td><td>15.9%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/SK-II.html'>SK-II</a></td><td>1,256</td><td>4.16</td><td>0.702</td><td>15.4%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/COLOR_WOW.html'>COLOR WOW</a></td><td>1,256</td><td>3.73</td><td>0.547</td><td>20.3%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/CHANEL.html'>CHANEL</a></td><td>1,237</td><td>4.47</td><td>0.768</td><td>10.2%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Living_Proof.html'>Living Proof</a></td><td>1,231</td><td>3.89</td><td>0.541</td><td>17.5%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Farmacy.html'>Farmacy</a></td><td>1,229</td><td>4.02</td><td>0.583</td><td>18.0%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Tata_Harper.html'>Tata Harper</a></td><td>1,228</td><td>4.50</td><td>0.839</td><td>8.6%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Kaja.html'>Kaja</a></td><td>1,226</td><td>4.44</td><td>0.804</td><td>10.1%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Rabanne.html'>Rabanne</a></td><td>1,226</td><td>4.57</td><td>0.824</td><td>7.4%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Saie.html'>Saie</a></td><td>1,219</td><td>4.19</td><td>0.670</td><td>13.3%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/IT_Cosmetics.html'>IT Cosmetics</a></td><td>1,211</td><td>4.16</td><td>0.781</td><td>17.9%</td><td>perceived_good_value</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Oribe.html'>Oribe</a></td><td>1,193</td><td>4.41</td><td>0.774</td><td>12.4%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Danessa_Myricks_Beauty.html'>Danessa Myricks Beauty</a></td><td>1,192</td><td>4.05</td><td>0.651</td><td>17.7%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Armani_Beauty.html'>Armani Beauty</a></td><td>1,191</td><td>4.52</td><td>0.845</td><td>7.7%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/SEPHORA_COLLECTION.html'>SEPHORA COLLECTION</a></td><td>1,185</td><td>4.11</td><td>0.711</td><td>12.8%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/caliray.html'>caliray</a></td><td>1,183</td><td>4.41</td><td>0.749</td><td>11.1%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/fresh.html'>fresh</a></td><td>1,168</td><td>3.89</td><td>0.579</td><td>21.2%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/By_Rosie_Jane.html'>By Rosie Jane</a></td><td>1,167</td><td>4.20</td><td>0.721</td><td>16.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/MILK_MAKEUP.html'>MILK MAKEUP</a></td><td>1,161</td><td>4.57</td><td>0.825</td><td>6.3%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/tarte.html'>tarte</a></td><td>1,160</td><td>4.12</td><td>0.625</td><td>15.4%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/LAWLESS.html'>LAWLESS</a></td><td>1,130</td><td>4.08</td><td>0.650</td><td>17.3%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Kulfi.html'>Kulfi</a></td><td>1,127</td><td>4.18</td><td>0.654</td><td>14.2%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/NARS.html'>NARS</a></td><td>1,109</td><td>3.98</td><td>0.555</td><td>16.1%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Lancôme.html'>Lancôme</a></td><td>1,105</td><td>4.35</td><td>0.746</td><td>12.8%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/DIOR.html'>DIOR</a></td><td>1,102</td><td>4.45</td><td>0.809</td><td>10.5%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Beautyblender.html'>Beautyblender</a></td><td>1,091</td><td>4.14</td><td>0.703</td><td>17.0%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Gucci.html'>Gucci</a></td><td>1,091</td><td>4.57</td><td>0.849</td><td>7.4%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/CLEAN_RESERVE.html'>CLEAN RESERVE</a></td><td>1,089</td><td>4.25</td><td>0.772</td><td>16.0%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Naturally_Serious.html'>Naturally Serious</a></td><td>1,081</td><td>4.58</td><td>0.724</td><td>8.0%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/HUDA_BEAUTY.html'>HUDA BEAUTY</a></td><td>1,070</td><td>4.01</td><td>0.610</td><td>10.9%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Charlotte_Tilbury.html'>Charlotte Tilbury</a></td><td>1,065</td><td>4.47</td><td>0.781</td><td>9.4%</td><td>mild_price_concern</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Augustinus_Bader.html'>Augustinus Bader</a></td><td>1,065</td><td>4.27</td><td>0.747</td><td>15.0%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/OUAI.html'>OUAI</a></td><td>1,058</td><td>4.34</td><td>0.728</td><td>13.1%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Freck_Beauty.html'>Freck Beauty</a></td><td>1,055</td><td>4.24</td><td>0.736</td><td>12.1%</td><td>price_driven_negativity</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/SKYLAR.html'>SKYLAR</a></td><td>1,047</td><td>3.96</td><td>0.708</td><td>22.3%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Marc_Jacobs_Fragrances.html'>Marc Jacobs Fragrances</a></td><td>1,032</td><td>4.42</td><td>0.794</td><td>12.1%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Hourglass.html'>Hourglass</a></td><td>1,031</td><td>4.31</td><td>0.705</td><td>11.5%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Verb.html'>Verb</a></td><td>1,023</td><td>4.12</td><td>0.629</td><td>16.4%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/ALTERNA_Haircare.html'>ALTERNA Haircare</a></td><td>1,019</td><td>4.60</td><td>0.779</td><td>7.1%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Shiseido.html'>Shiseido</a></td><td>1,007</td><td>4.17</td><td>0.574</td><td>13.8%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/NATASHA_DENONA.html'>NATASHA DENONA</a></td><td>1,000</td><td>4.42</td><td>0.760</td><td>9.5%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/bareMinerals.html'>bareMinerals</a></td><td>1,000</td><td>4.15</td><td>0.665</td><td>13.7%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Mugler.html'>Mugler</a></td><td>997</td><td>4.11</td><td>0.699</td><td>18.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/adwoa_beauty.html'>adwoa beauty</a></td><td>995</td><td>4.29</td><td>0.696</td><td>13.5%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Kérastase.html'>Kérastase</a></td><td>989</td><td>4.21</td><td>0.703</td><td>14.6%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/ONE_SIZE_by_Patrick_Starrr.html'>ONE/SIZE by Patrick Starrr</a></td><td>983</td><td>3.86</td><td>0.519</td><td>21.7%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Givenchy.html'>Givenchy</a></td><td>982</td><td>3.80</td><td>0.639</td><td>18.0%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Youth_To_The_People.html'>Youth To The People</a></td><td>974</td><td>4.11</td><td>0.617</td><td>14.5%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/VIOLETTE_FR.html'>VIOLETTE_FR</a></td><td>962</td><td>4.35</td><td>0.821</td><td>12.2%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/The_INKEY_List.html'>The INKEY List</a></td><td>953</td><td>4.04</td><td>0.579</td><td>12.5%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Fable___Mane.html'>Fable & Mane</a></td><td>951</td><td>4.61</td><td>0.791</td><td>5.5%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/ghd.html'>ghd</a></td><td>949</td><td>4.25</td><td>0.737</td><td>12.3%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Fenty_Beauty_by_Rihanna.html'>Fenty Beauty by Rihanna</a></td><td>939</td><td>4.10</td><td>0.640</td><td>16.1%</td><td>price_driven_negativity</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/dae.html'>dae</a></td><td>936</td><td>3.85</td><td>0.628</td><td>21.4%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/GUERLAIN.html'>GUERLAIN</a></td><td>935</td><td>4.31</td><td>0.768</td><td>13.7%</td><td>mild_price_concern</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Laura_Mercier.html'>Laura Mercier</a></td><td>913</td><td>4.38</td><td>0.724</td><td>10.1%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Act_Acre.html'>Act+Acre</a></td><td>897</td><td>4.59</td><td>0.750</td><td>7.7%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/belif.html'>belif</a></td><td>897</td><td>4.39</td><td>0.649</td><td>10.4%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Grande_Cosmetics.html'>Grande Cosmetics</a></td><td>896</td><td>4.00</td><td>0.509</td><td>19.9%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Peter_Thomas_Roth.html'>Peter Thomas Roth</a></td><td>893</td><td>3.98</td><td>0.625</td><td>18.1%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/JVN.html'>JVN</a></td><td>885</td><td>4.12</td><td>0.631</td><td>19.0%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/KORA_Organics.html'>KORA Organics</a></td><td>881</td><td>4.43</td><td>0.728</td><td>8.3%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/CLINIQUE.html'>CLINIQUE</a></td><td>873</td><td>4.27</td><td>0.611</td><td>13.9%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/BURBERRY.html'>BURBERRY</a></td><td>869</td><td>4.29</td><td>0.761</td><td>14.0%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/RIES.html'>RIES</a></td><td>865</td><td>3.61</td><td>0.538</td><td>16.8%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Lilly_Lashes.html'>Lilly Lashes</a></td><td>865</td><td>4.43</td><td>0.772</td><td>9.6%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/ciele.html'>ciele</a></td><td>859</td><td>4.41</td><td>0.805</td><td>10.9%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Dermalogica.html'>Dermalogica</a></td><td>851</td><td>4.17</td><td>0.605</td><td>16.9%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/First_Aid_Beauty.html'>First Aid Beauty</a></td><td>846</td><td>4.06</td><td>0.525</td><td>17.3%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Bumble_and_bumble.html'>Bumble and bumble</a></td><td>845</td><td>4.34</td><td>0.653</td><td>11.6%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/NUDESTIX.html'>NUDESTIX</a></td><td>845</td><td>4.40</td><td>0.808</td><td>8.8%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/StriVectin.html'>StriVectin</a></td><td>844</td><td>4.47</td><td>0.783</td><td>8.2%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/MATTER_OF_FACT.html'>MATTER OF FACT</a></td><td>844</td><td>4.50</td><td>0.787</td><td>9.6%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Glow_Recipe.html'>Glow Recipe</a></td><td>843</td><td>4.31</td><td>0.705</td><td>12.5%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Montblanc.html'>Montblanc</a></td><td>837</td><td>4.70</td><td>0.858</td><td>5.3%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Isle_of_Paradise.html'>Isle of Paradise</a></td><td>836</td><td>4.23</td><td>0.726</td><td>11.2%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Dr__Dennis_Gross_Skincare.html'>Dr. Dennis Gross Skincare</a></td><td>831</td><td>4.35</td><td>0.539</td><td>14.0%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Ceremonia.html'>Ceremonia</a></td><td>830</td><td>4.48</td><td>0.741</td><td>11.6%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Bobbi_Brown.html'>Bobbi Brown</a></td><td>824</td><td>4.53</td><td>0.783</td><td>6.1%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/LYS_Beauty.html'>LYS Beauty</a></td><td>808</td><td>4.35</td><td>0.731</td><td>11.4%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/BondiBoost.html'>BondiBoost</a></td><td>800</td><td>4.46</td><td>0.714</td><td>9.2%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Iris_Romeo.html'>Iris&Romeo</a></td><td>788</td><td>4.36</td><td>0.695</td><td>12.4%</td><td>mild_price_concern</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Peace_Out.html'>Peace Out</a></td><td>783</td><td>4.25</td><td>0.647</td><td>12.9%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Iconic_London.html'>Iconic London</a></td><td>779</td><td>4.18</td><td>0.690</td><td>14.1%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/TOM_FORD.html'>TOM FORD</a></td><td>778</td><td>4.41</td><td>0.856</td><td>11.6%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Pureology.html'>Pureology</a></td><td>771</td><td>4.39</td><td>0.729</td><td>10.9%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Ralph_Lauren.html'>Ralph Lauren</a></td><td>771</td><td>4.61</td><td>0.813</td><td>6.9%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/BREAD_BEAUTY_SUPPLY.html'>BREAD BEAUTY SUPPLY</a></td><td>766</td><td>4.36</td><td>0.744</td><td>12.8%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Summer_Fridays.html'>Summer Fridays</a></td><td>765</td><td>4.52</td><td>0.794</td><td>8.9%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Davines.html'>Davines</a></td><td>761</td><td>4.57</td><td>0.803</td><td>7.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Viktor_Rolf.html'>Viktor&Rolf</a></td><td>761</td><td>4.50</td><td>0.760</td><td>11.3%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Slip.html'>Slip</a></td><td>755</td><td>3.73</td><td>0.540</td><td>23.2%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/PATTERN_by_Tracee_Ellis_Ross.html'>PATTERN by Tracee Ellis Ross</a></td><td>750</td><td>4.33</td><td>0.677</td><td>14.0%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Nette.html'>Nette</a></td><td>749</td><td>4.59</td><td>0.837</td><td>7.7%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Elemis.html'>Elemis</a></td><td>749</td><td>4.64</td><td>0.778</td><td>7.1%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Chloé.html'>Chloé</a></td><td>746</td><td>4.25</td><td>0.732</td><td>16.2%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Boy_Smells.html'>Boy Smells</a></td><td>742</td><td>4.63</td><td>0.874</td><td>8.1%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Carolina_Herrera.html'>Carolina Herrera</a></td><td>738</td><td>4.43</td><td>0.753</td><td>9.9%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Hanni.html'>Hanni</a></td><td>737</td><td>4.60</td><td>0.739</td><td>9.0%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Dr__Idriss.html'>Dr. Idriss</a></td><td>732</td><td>4.46</td><td>0.715</td><td>11.2%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Ultra_Violette.html'>Ultra Violette</a></td><td>728</td><td>4.40</td><td>0.739</td><td>10.6%</td><td>perceived_good_value</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Dr__Barbara_Sturm.html'>Dr. Barbara Sturm</a></td><td>724</td><td>4.47</td><td>0.770</td><td>9.7%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/shu_uemura.html'>shu uemura</a></td><td>715</td><td>4.56</td><td>0.749</td><td>9.5%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/ROSE_INC.html'>ROSE INC</a></td><td>708</td><td>4.26</td><td>0.735</td><td>13.8%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Nutrafol.html'>Nutrafol</a></td><td>703</td><td>4.32</td><td>0.606</td><td>11.7%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/BeautyBio.html'>BeautyBio</a></td><td>701</td><td>4.39</td><td>0.715</td><td>11.1%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Melanin_Haircare.html'>Melanin Haircare</a></td><td>699</td><td>4.65</td><td>0.765</td><td>6.2%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/REFY.html'>REFY</a></td><td>698</td><td>4.22</td><td>0.631</td><td>12.6%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Jean_Paul_Gaultier.html'>Jean Paul Gaultier</a></td><td>696</td><td>4.48</td><td>0.831</td><td>9.1%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/MAED.html'>MAED</a></td><td>692</td><td>4.58</td><td>0.931</td><td>9.4%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Briogeo.html'>Briogeo</a></td><td>691</td><td>4.29</td><td>0.661</td><td>12.0%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/L_Oréal_Professionnel.html'>L'Oréal Professionnel</a></td><td>680</td><td>4.55</td><td>0.813</td><td>7.5%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/PHLUR.html'>PHLUR</a></td><td>679</td><td>4.01</td><td>0.628</td><td>18.1%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/TWEEZERMAN.html'>TWEEZERMAN</a></td><td>679</td><td>3.77</td><td>0.443</td><td>20.0%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/54_Thrones.html'>54 Thrones</a></td><td>673</td><td>4.30</td><td>0.687</td><td>12.6%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/RŌZ.html'>RŌZ</a></td><td>667</td><td>4.66</td><td>0.899</td><td>5.5%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/ISDIN.html'>ISDIN</a></td><td>662</td><td>4.80</td><td>0.801</td><td>3.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/NEST_New_York.html'>NEST New York</a></td><td>658</td><td>4.26</td><td>0.724</td><td>16.0%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/BASMA.html'>BASMA</a></td><td>654</td><td>4.70</td><td>0.834</td><td>3.4%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/ALPYN.html'>ALPYN</a></td><td>654</td><td>4.55</td><td>0.785</td><td>6.6%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Tower_28_Beauty.html'>Tower 28 Beauty</a></td><td>649</td><td>4.12</td><td>0.601</td><td>13.7%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/K18_Biomimetic_Hairscience.html'>K18 Biomimetic Hairscience</a></td><td>644</td><td>4.03</td><td>0.510</td><td>17.4%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Saint_Jane_Beauty.html'>Saint Jane Beauty</a></td><td>641</td><td>4.46</td><td>0.709</td><td>11.4%</td><td>mild_price_concern</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Jo_Malone_London.html'>Jo Malone London</a></td><td>631</td><td>4.48</td><td>0.843</td><td>11.1%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Shani_Darden_Skin_Care.html'>Shani Darden Skin Care</a></td><td>630</td><td>4.55</td><td>0.729</td><td>9.2%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/KILIAN_Paris.html'>KILIAN Paris</a></td><td>625</td><td>4.19</td><td>0.703</td><td>15.7%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Luna_Daily.html'>Luna Daily</a></td><td>623</td><td>4.58</td><td>0.819</td><td>6.7%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/The_Ordinary.html'>The Ordinary</a></td><td>622</td><td>4.30</td><td>0.489</td><td>12.2%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/AESTURA.html'>AESTURA</a></td><td>621</td><td>4.73</td><td>0.771</td><td>4.8%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/DedCool.html'>DedCool</a></td><td>619</td><td>4.03</td><td>0.791</td><td>18.4%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Sulwhasoo.html'>Sulwhasoo</a></td><td>606</td><td>4.37</td><td>0.734</td><td>9.4%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/amika.html'>amika</a></td><td>603</td><td>4.26</td><td>0.630</td><td>14.9%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Juliette_Has_a_Gun.html'>Juliette Has a Gun</a></td><td>590</td><td>3.91</td><td>0.669</td><td>23.2%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/GOOP.html'>GOOP</a></td><td>585</td><td>4.30</td><td>0.796</td><td>14.7%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Harlem_Perfume_Co.html'>Harlem Perfume Co.</a></td><td>582</td><td>4.79</td><td>0.965</td><td>3.3%</td><td>price_neutral</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/SIMIHAZE_BEAUTY.html'>SIMIHAZE BEAUTY</a></td><td>575</td><td>4.20</td><td>0.780</td><td>12.3%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/KORRES.html'>KORRES</a></td><td>574</td><td>4.43</td><td>0.725</td><td>13.9%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Mango_People.html'>Mango People</a></td><td>573</td><td>4.57</td><td>0.825</td><td>5.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Ellis_Brooklyn.html'>Ellis Brooklyn</a></td><td>573</td><td>3.99</td><td>0.703</td><td>20.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Maison_Louis_Marie.html'>Maison Louis Marie</a></td><td>572</td><td>3.89</td><td>0.638</td><td>22.7%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Dolce_Gabbana.html'>Dolce&Gabbana</a></td><td>569</td><td>4.25</td><td>0.686</td><td>15.6%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/CAY_SKIN.html'>CAY SKIN</a></td><td>565</td><td>4.02</td><td>0.619</td><td>18.2%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Kiehl_s_Since_1851.html'>Kiehl's Since 1851</a></td><td>565</td><td>3.95</td><td>0.539</td><td>17.0%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Fara_Homidi.html'>Fara Homidi</a></td><td>563</td><td>4.58</td><td>0.836</td><td>8.5%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/m_ph_by_Mary_Phillips.html'>m.ph by Mary Phillips</a></td><td>557</td><td>4.71</td><td>0.877</td><td>5.4%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Commodity.html'>Commodity</a></td><td>556</td><td>4.02</td><td>0.703</td><td>21.0%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Hyper_Skin.html'>Hyper Skin</a></td><td>554</td><td>4.35</td><td>0.689</td><td>10.8%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Ariana_Grande.html'>Ariana Grande</a></td><td>553</td><td>4.52</td><td>0.798</td><td>8.1%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Lux_Unfiltered.html'>Lux Unfiltered</a></td><td>552</td><td>4.51</td><td>0.781</td><td>8.7%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Crown_Affair.html'>Crown Affair</a></td><td>550</td><td>4.47</td><td>0.714</td><td>11.5%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Cinema_Secrets.html'>Cinema Secrets</a></td><td>550</td><td>4.16</td><td>0.610</td><td>14.2%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/The_Nue_Co.html'>The Nue Co.</a></td><td>544</td><td>4.47</td><td>0.699</td><td>11.8%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/OUI_the_People.html'>OUI the People</a></td><td>541</td><td>4.54</td><td>0.819</td><td>10.4%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Clarins.html'>Clarins</a></td><td>540</td><td>4.46</td><td>0.842</td><td>12.2%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/banu.html'>banu</a></td><td>538</td><td>4.67</td><td>0.902</td><td>6.5%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Kate_McLeod.html'>Kate McLeod</a></td><td>530</td><td>4.19</td><td>0.725</td><td>13.2%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/SHAZ___KIKS.html'>SHAZ & KIKS</a></td><td>523</td><td>4.53</td><td>0.805</td><td>9.6%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Element_Eight.html'>Element Eight</a></td><td>520</td><td>4.68</td><td>0.917</td><td>6.5%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/L_Occitane.html'>L'Occitane</a></td><td>520</td><td>4.22</td><td>0.713</td><td>16.3%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/SOFIE_PAVITT_FACE.html'>SOFIE PAVITT FACE</a></td><td>520</td><td>4.77</td><td>0.761</td><td>6.9%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Chris_McMillan.html'>Chris McMillan</a></td><td>516</td><td>4.87</td><td>0.835</td><td>1.7%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Josie_Maran.html'>Josie Maran</a></td><td>508</td><td>4.36</td><td>0.715</td><td>10.8%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/KVD_Beauty.html'>KVD Beauty</a></td><td>500</td><td>3.33</td><td>0.433</td><td>25.0%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Gisou.html'>Gisou</a></td><td>499</td><td>4.52</td><td>0.762</td><td>11.0%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Sarah_Creal.html'>Sarah Creal</a></td><td>498</td><td>4.47</td><td>0.764</td><td>10.0%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/NuFACE.html'>NuFACE</a></td><td>494</td><td>4.35</td><td>0.775</td><td>12.3%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/VOLUSPA.html'>VOLUSPA</a></td><td>491</td><td>4.36</td><td>0.767</td><td>10.8%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Paula_s_Choice.html'>Paula's Choice</a></td><td>488</td><td>4.41</td><td>0.636</td><td>11.9%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/RANAVAT.html'>RANAVAT</a></td><td>488</td><td>4.37</td><td>0.835</td><td>12.3%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Viori.html'>Viori</a></td><td>486</td><td>4.56</td><td>0.816</td><td>7.2%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Velour_Lashes.html'>Velour Lashes</a></td><td>486</td><td>4.46</td><td>0.758</td><td>7.4%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Lion_Pose.html'>Lion Pose</a></td><td>483</td><td>4.28</td><td>0.682</td><td>13.7%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Messy_by_Alli_Webb.html'>Messy by Alli Webb</a></td><td>483</td><td>4.69</td><td>0.837</td><td>6.4%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Jack_Black.html'>Jack Black</a></td><td>480</td><td>4.50</td><td>0.647</td><td>10.2%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/House_of_Lashes.html'>House of Lashes</a></td><td>479</td><td>4.23</td><td>0.624</td><td>12.9%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Evereden.html'>Evereden</a></td><td>464</td><td>4.54</td><td>0.873</td><td>6.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Biodance.html'>Biodance</a></td><td>462</td><td>4.61</td><td>0.871</td><td>4.8%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/5_SENS.html'>5 SENS</a></td><td>461</td><td>4.66</td><td>0.866</td><td>7.6%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Topicals.html'>Topicals</a></td><td>457</td><td>4.62</td><td>0.670</td><td>8.1%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/DAMDAM.html'>DAMDAM</a></td><td>455</td><td>4.69</td><td>0.788</td><td>4.2%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Caudalie.html'>Caudalie</a></td><td>454</td><td>4.05</td><td>0.604</td><td>14.3%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Mane.html'>Mane</a></td><td>454</td><td>4.47</td><td>0.774</td><td>7.7%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/AAVRANI.html'>AAVRANI</a></td><td>444</td><td>4.47</td><td>0.721</td><td>11.5%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/innisfree.html'>innisfree</a></td><td>425</td><td>4.46</td><td>0.678</td><td>9.9%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/The_Maker.html'>The Maker</a></td><td>419</td><td>4.28</td><td>0.792</td><td>12.6%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/HERMÈS.html'>HERMÈS</a></td><td>418</td><td>4.43</td><td>0.840</td><td>10.5%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Soft_Services.html'>Soft Services</a></td><td>415</td><td>4.71</td><td>0.748</td><td>8.4%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/MARA.html'>MARA</a></td><td>413</td><td>4.66</td><td>0.812</td><td>8.5%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Then_I_Met_You.html'>Then I Met You</a></td><td>408</td><td>4.79</td><td>0.796</td><td>5.9%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Curlsmith.html'>Curlsmith</a></td><td>406</td><td>4.49</td><td>0.684</td><td>12.8%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Dieux.html'>Dieux</a></td><td>404</td><td>4.63</td><td>0.716</td><td>7.7%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Torriden.html'>Torriden</a></td><td>398</td><td>4.85</td><td>0.823</td><td>2.8%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Bio_Ionic.html'>Bio Ionic</a></td><td>393</td><td>4.42</td><td>0.793</td><td>9.7%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/rhode.html'>rhode</a></td><td>389</td><td>4.39</td><td>0.787</td><td>9.0%</td><td>price_driven_negativity</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Ami_Colé.html'>Ami Colé</a></td><td>385</td><td>4.59</td><td>0.785</td><td>5.5%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Henry_Rose.html'>Henry Rose</a></td><td>383</td><td>4.65</td><td>0.844</td><td>7.6%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Salt___Stone.html'>Salt & Stone</a></td><td>374</td><td>4.18</td><td>0.725</td><td>13.4%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Azzaro.html'>Azzaro</a></td><td>369</td><td>4.77</td><td>0.891</td><td>4.9%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Hanyul.html'>Hanyul</a></td><td>364</td><td>4.84</td><td>0.866</td><td>2.2%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Valentino.html'>Valentino</a></td><td>363</td><td>4.67</td><td>0.797</td><td>5.5%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/T3.html'>T3</a></td><td>354</td><td>4.71</td><td>0.816</td><td>5.4%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/The_7_Virtues.html'>The 7 Virtues</a></td><td>337</td><td>4.29</td><td>0.698</td><td>13.1%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/KAYALI.html'>KAYALI</a></td><td>336</td><td>4.36</td><td>0.752</td><td>12.5%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Donna_Karan.html'>Donna Karan</a></td><td>331</td><td>4.08</td><td>0.589</td><td>19.6%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/FORVR_MOOD.html'>FORVR MOOD</a></td><td>329</td><td>4.19</td><td>0.764</td><td>15.8%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/LANEIGE.html'>LANEIGE</a></td><td>323</td><td>4.61</td><td>0.740</td><td>8.0%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Katini_Skin.html'>Katini Skin</a></td><td>312</td><td>4.81</td><td>0.871</td><td>1.9%</td><td>perceived_good_value</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/maude.html'>maude</a></td><td>307</td><td>4.75</td><td>0.784</td><td>6.2%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Hello_Sunday.html'>Hello Sunday</a></td><td>305</td><td>3.95</td><td>0.651</td><td>16.7%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/Experiment.html'>Experiment</a></td><td>302</td><td>4.70</td><td>0.860</td><td>4.0%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Stripes.html'>Stripes</a></td><td>288</td><td>4.17</td><td>0.741</td><td>17.4%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Glamnetic.html'>Glamnetic</a></td><td>285</td><td>3.67</td><td>0.527</td><td>20.7%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Shark_Beauty.html'>Shark Beauty</a></td><td>282</td><td>4.44</td><td>0.803</td><td>8.2%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Rossano_Ferretti_Parma.html'>Rossano Ferretti Parma</a></td><td>281</td><td>4.71</td><td>0.826</td><td>5.3%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/EADEM.html'>EADEM</a></td><td>276</td><td>4.62</td><td>0.727</td><td>6.5%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/YSE_Beauty.html'>YSE Beauty</a></td><td>274</td><td>4.59</td><td>0.871</td><td>5.1%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/DUO.html'>DUO</a></td><td>270</td><td>3.75</td><td>0.426</td><td>16.3%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/LoveShackFancy.html'>LoveShackFancy</a></td><td>268</td><td>4.38</td><td>0.815</td><td>11.2%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Fashion_Fair.html'>Fashion Fair</a></td><td>264</td><td>4.37</td><td>0.739</td><td>12.9%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Touchland.html'>Touchland</a></td><td>262</td><td>4.10</td><td>0.725</td><td>17.2%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Facile.html'>Facile</a></td><td>252</td><td>4.69</td><td>0.816</td><td>5.6%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Montale.html'>Montale</a></td><td>222</td><td>4.39</td><td>0.783</td><td>9.9%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/DERMAFLASH.html'>DERMAFLASH</a></td><td>221</td><td>4.01</td><td>0.548</td><td>16.7%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Hugo_Boss.html'>Hugo Boss</a></td><td>218</td><td>4.61</td><td>0.895</td><td>7.3%</td><td>perceived_good_value</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/ROSE_Ingleton_MD.html'>ROSE Ingleton MD</a></td><td>207</td><td>4.67</td><td>0.796</td><td>8.2%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/PHYLA.html'>PHYLA</a></td><td>206</td><td>4.83</td><td>0.656</td><td>4.4%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/manucurist.html'>manucurist</a></td><td>183</td><td>4.48</td><td>0.874</td><td>8.2%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Sienna_Naturals.html'>Sienna Naturals</a></td><td>183</td><td>4.63</td><td>0.748</td><td>8.2%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Beauty_of_Joseon.html'>Beauty of Joseon</a></td><td>178</td><td>4.52</td><td>0.790</td><td>6.7%</td><td>perceived_good_value</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/HUNG_VANNGO_BEAUTY.html'>HUNG VANNGO BEAUTY</a></td><td>174</td><td>4.53</td><td>0.666</td><td>6.9%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Dezi_Skin.html'>Dezi Skin</a></td><td>171</td><td>4.97</td><td>0.715</td><td>4.1%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Melt_Cosmetics.html'>Melt Cosmetics</a></td><td>170</td><td>4.07</td><td>0.552</td><td>15.9%</td><td>mild_price_concern</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/BROWN_GIRL_Jane.html'>BROWN GIRL Jane</a></td><td>163</td><td>4.43</td><td>0.711</td><td>9.2%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/FOREO.html'>FOREO</a></td><td>152</td><td>3.91</td><td>0.537</td><td>14.5%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Mario_Badescu.html'>Mario Badescu</a></td><td>151</td><td>4.28</td><td>0.678</td><td>13.2%</td><td>price_neutral</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/CANOPY.html'>CANOPY</a></td><td>141</td><td>4.35</td><td>0.713</td><td>12.1%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/HigherDOSE.html'>HigherDOSE</a></td><td>135</td><td>4.16</td><td>0.651</td><td>14.1%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/ISAMAYA.html'>ISAMAYA</a></td><td>135</td><td>3.70</td><td>0.499</td><td>20.7%</td><td>price_neutral</td><td>diffuse</td></tr>
+<tr><td><a href='brand_dashboards/World_of_Chris_Collins.html'>World of Chris Collins</a></td><td>122</td><td>4.45</td><td>0.797</td><td>9.8%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Sincerely_Yours.html'>Sincerely Yours</a></td><td>112</td><td>4.51</td><td>0.874</td><td>9.8%</td><td>perceived_good_value</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/fel_beauty.html'>fel beauty</a></td><td>111</td><td>4.68</td><td>0.941</td><td>6.3%</td><td>price_neutral</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/JIMMY_CHOO.html'>JIMMY CHOO</a></td><td>104</td><td>4.64</td><td>0.863</td><td>8.7%</td><td>price_neutral</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/BaBylissPRO.html'>BaBylissPRO</a></td><td>101</td><td>4.52</td><td>0.777</td><td>8.9%</td><td>price_neutral</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/LORE.html'>LORE</a></td><td>100</td><td>4.39</td><td>0.865</td><td>11.0%</td><td>mild_price_concern</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/Ebb_Ocean_Club.html'>Ebb Ocean Club</a></td><td>100</td><td>4.96</td><td>0.813</td><td>2.0%</td><td>price_neutral</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/Miu_Miu.html'>Miu Miu</a></td><td>100</td><td>4.75</td><td>0.922</td><td>5.0%</td><td>price_neutral</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/Dr__Jart.html'>Dr. Jart+</a></td><td>100</td><td>4.59</td><td>0.882</td><td>5.0%</td><td>price_neutral</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/Erborian.html'>Erborian</a></td><td>100</td><td>4.87</td><td>0.870</td><td>1.0%</td><td>perceived_good_value</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/Kenra_Professional.html'>Kenra Professional</a></td><td>100</td><td>4.60</td><td>0.855</td><td>11.0%</td><td>perceived_good_value</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/Dyson.html'>Dyson</a></td><td>97</td><td>4.53</td><td>0.803</td><td>6.2%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Range_Beauty.html'>Range Beauty</a></td><td>90</td><td>4.36</td><td>0.750</td><td>11.1%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/LIGHTSAVER.html'>LIGHTSAVER</a></td><td>90</td><td>4.57</td><td>0.682</td><td>13.3%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/Emi_Jay.html'>Emi Jay</a></td><td>86</td><td>4.83</td><td>0.812</td><td>2.3%</td><td>mild_price_concern</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/Cyklar.html'>Cyklar</a></td><td>80</td><td>4.91</td><td>0.911</td><td>1.2%</td><td>price_neutral</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/Wonderskin.html'>Wonderskin</a></td><td>80</td><td>3.61</td><td>0.514</td><td>23.8%</td><td>price_driven_negativity</td><td>moderate</td></tr>
+<tr><td><a href='brand_dashboards/U_Beauty.html'>U Beauty</a></td><td>69</td><td>4.72</td><td>0.784</td><td>4.3%</td><td>mild_price_concern</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/superzero.html'>superzero</a></td><td>63</td><td>4.37</td><td>0.786</td><td>7.9%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Unove.html'>Unove</a></td><td>45</td><td>4.82</td><td>0.896</td><td>2.2%</td><td>price_neutral</td><td>insufficient_data</td></tr>
+<tr><td><a href='brand_dashboards/Chunks.html'>Chunks</a></td><td>41</td><td>4.41</td><td>0.678</td><td>12.2%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Rahua.html'>Rahua</a></td><td>37</td><td>3.11</td><td>0.396</td><td>29.7%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/The_Original_MakeUp_Eraser.html'>The Original MakeUp Eraser</a></td><td>33</td><td>3.97</td><td>0.531</td><td>12.1%</td><td>price_driven_negativity</td><td>concentrated</td></tr>
+<tr><td><a href='brand_dashboards/Laura_Geller.html'>Laura Geller</a></td><td>30</td><td>4.07</td><td>0.663</td><td>16.7%</td><td>perceived_good_value</td><td>concentrated</td></tr>
+    </tbody>
+  </table>
+  <script>
+    function filterTable() {
+      const q = document.getElementById("search").value.toLowerCase();
+      document.querySelectorAll("#brandTable tbody tr").forEach(row => {
+        row.style.display = row.cells[0].textContent.toLowerCase().includes(q) ? "" : "none";
+      });
+    }
+  </script>
+</body>
+</html>

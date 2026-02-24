@@ -1,14 +1,15 @@
 """
 Brand Health & Sentiment Analysis — Sephora
-=============================================
 
 Usage:
   As script (runs full pipeline):
-    python src/sephora_brand_health.py
+    python src/sephora_sentiment.py
 
   As import (dashboard only, loads from pre-built CSVs):
-    from sephora_brand_health import show_dashboard
-    show_dashboard()
+    from sephora_sentiment import show_dashboard          # Jupyter notebook (interactive dropdown)
+    from sephora_sentiment import show_overview           # Jupyter notebook (overview scatter only)
+    from sephora_sentiment import write_brand_html        # browser — single brand
+    from sephora_sentiment import write_all_brand_htmls   # browser — all brands + index page
 
 Pipeline (Steps 1–9, runs via script or run_pipeline()):
   1. Text preprocessing & review filtering
@@ -19,10 +20,16 @@ Pipeline (Steps 1–9, runs via script or run_pipeline()):
   6. Delighters vs. disappointers per brand
   7. Complaint concentration analysis
   8. Price/value perception diagnostics
-  9. Brand-level aggregation → CSVs
+  9. Brand-level aggregation → CSVs + overview HTML
 
-Dashboard (Step 10, runs via show_dashboard()):
-  Interactive Plotly + ipywidgets brand toggle over ALL brands.
+Dashboard — Jupyter notebook (Step 10, runs via show_dashboard()):
+  Interactive Plotly + ipywidgets brand dropdown over ALL brands.
+  Requires a running Jupyter server; not available in exported HTML.
+
+Dashboard — Browser (Step 10 alternative, runs via write_all_brand_htmls()):
+  Saves one self-contained HTML per brand to outputs/brand_dashboards/,
+  plus an index page (sephora_brand_dashboards_index.html) linking all brands.
+  No server required — open any file directly in a browser.
 
 Inputs:
   data/processed/Sephora/sephora_products.csv
@@ -38,7 +45,9 @@ Outputs (CSVs):
   data/processed/Sephora/sephora_value_perception.csv
 
 Outputs (HTML):
-  notebooks/independent/outputs/sephora_brand_health_overview.html
+  notebooks/independent/outputs/sephora_brand_health_overview.html   (overview scatter, browser)
+  notebooks/independent/outputs/brand_dashboards/<brand>.html         (per-brand, browser)
+  notebooks/independent/outputs/sephora_brand_dashboards_index.html           (index page, browser)
 """
 
 import pandas as pd
@@ -61,7 +70,8 @@ warnings.filterwarnings("ignore")
 _SCRIPT_DIR = Path(__file__).resolve().parent          # src/
 PROJECT_ROOT = _SCRIPT_DIR.parent                       # Algorithmic_Marketing_Final_Project/
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "Sephora"
-OUTPUT_DIR = PROJECT_ROOT / "notebooks" / "independent" /"outputs"
+OUTPUT_DIR = PROJECT_ROOT / "notebooks" / "independent" / "outputs"
+BRAND_DASHBOARD_DIR = OUTPUT_DIR / "brand_dashboards"
 MIN_BRAND_REVIEWS = 30
 N_TOPICS = 12
 MIN_REVIEW_LENGTH = 20
@@ -113,6 +123,11 @@ def _load_data():
     elapsed = time.time() - t0
     print(f"  Loaded {len(_data['dashboard_brands'])} brands, "
           f"{len(_data['reviews']):,} reviews in {elapsed:.1f}s")
+
+
+def _slug(brand_name):
+    """Convert a brand name to a safe filename slug."""
+    return re.sub(r"[^\w\-]", "_", brand_name).strip("_")
 
 
 # PIPELINE: run_pipeline()
@@ -297,7 +312,7 @@ def run_pipeline():
 
     # STEP 7: Complaint Concentration Analysis
     print("STEP 7: Complaint concentration analysis")
-    
+
     complaint_rows = []
     for brand, bdf in reviews.groupby("brand"):
         if len(bdf) < MIN_BRAND_REVIEWS:
@@ -335,7 +350,7 @@ def run_pipeline():
 
     # STEP 8: Price/Value Perception Diagnostics
     print("STEP 8: Price/value perception diagnostics")
-    
+
     value_pattern = "|".join(VALUE_KEYWORDS)
     reviews["mentions_value"] = reviews["clean_text"].str.lower().str.contains(
         value_pattern, regex=True, na=False,
@@ -448,7 +463,7 @@ def run_pipeline():
 
     # Save CSVs
     print("Saving CSVs")
-    
+
     brand_agg.to_csv(PROCESSED_DIR / "sephora_brand_health.csv", index=False)
     print(f"  -> sephora_brand_health.csv ({len(brand_agg)} brands)")
 
@@ -484,12 +499,16 @@ def run_pipeline():
     fig_overview = _build_overview(brand_agg)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     fig_overview.write_html(OUTPUT_DIR / "sephora_brand_health_overview.html")
-    print(f"  -> {OUTPUT_DIR}/sephora_brand_health_overview.html")
+    print(f"  -> sephora_brand_health_overview.html")
 
-    print("Pipeline complete. In a notebook, call show_dashboard()")
+    print(
+        "\nPipeline complete."
+        "\n  Notebook (interactive dropdown): call show_dashboard()"
+        "\n  Browser (per-brand HTML files):  call write_all_brand_htmls()"
+    )
 
 
-#  DASHBOARD FUNCTIONS (work on import — load from CSVs)
+# DASHBOARD FUNCTIONS (work on import — load from CSVs)
 
 def _build_overview(brand_agg):
     """Build the brand health overview scatter."""
@@ -535,6 +554,8 @@ def _build_overview(brand_agg):
 def build_brand_dashboard(brand_name):
     """
     Build a 12-panel brand health dashboard for a single brand.
+    Returns a Plotly Figure — call .show() in a notebook or
+    .write_html(path) to save as a browser-accessible file.
     Loads from CSVs if data not already in memory.
     """
 
@@ -714,7 +735,6 @@ def build_brand_dashboard(brand_name):
     if pd.isna(del_kw):
         del_kw = "\u2014"
     else:
-        # Shorten to first 5 keywords
         del_kw = ", ".join(str(del_kw).split(", ")[:5])
     if pd.isna(dis_kw):
         dis_kw = "\u2014"
@@ -764,8 +784,155 @@ def build_brand_dashboard(brand_name):
     return fig
 
 
+# BROWSER EXPORT FUNCTIONS
+
+def write_brand_html(brand_name, output_dir=None):
+    """
+    Save a single brand's 12-panel dashboard as a self-contained HTML file
+    that can be opened in any browser without a running Jupyter server.
+
+    Args:
+        brand_name:  Exact brand name string (must exist in sephora_brand_health.csv).
+        output_dir:  Path to save the file. Defaults to
+                     notebooks/independent/outputs/brand_dashboards/.
+
+    Returns:
+        Path object pointing to the written file.
+
+    Usage:
+        from sephora_sentiment import write_brand_html
+        write_brand_html("Charlotte Tilbury")
+        write_brand_html("NARS", output_dir="my_reports/")
+    """
+    out = Path(output_dir) if output_dir else BRAND_DASHBOARD_DIR
+    out.mkdir(parents=True, exist_ok=True)
+    fig = build_brand_dashboard(brand_name)
+    path = out / f"{_slug(brand_name)}.html"
+    fig.write_html(str(path), include_plotlyjs="cdn")
+    print(f"  -> {path}")
+    return path
+
+
+def write_all_brand_htmls(output_dir=None):
+    """
+    Save a self-contained HTML dashboard for every qualifying brand, then
+    generate a linked index page (sephora_brand_dashboards_index.html) listing all brands.
+    All files can be opened in any browser without a running Jupyter server.
+
+    Args:
+        output_dir:  Directory to save brand HTML files. Defaults to
+                     notebooks/independent/outputs/brand_dashboards/.
+                     The index page is always written one level up
+                     (notebooks/independent/outputs/sephora_brand_dashboards_index.html).
+
+    Usage:
+        from sephora_sentiment import write_all_brand_htmls
+        write_all_brand_htmls()
+        write_all_brand_htmls(output_dir="my_reports/brands/")
+    """
+    _load_data()
+    brands = _data["dashboard_brands"]
+    out = Path(output_dir) if output_dir else BRAND_DASHBOARD_DIR
+    out.mkdir(parents=True, exist_ok=True)
+
+    print(f"Writing {len(brands)} brand dashboards to {out}/")
+    written = []
+    for i, brand in enumerate(brands, 1):
+        try:
+            path = write_brand_html(brand, output_dir=out)
+            written.append((brand, path.name))
+            if i % 25 == 0:
+                print(f"  {i}/{len(brands)} complete...")
+        except Exception as e:
+            print(f"  WARNING: skipped {brand!r} — {e}")
+
+    # Build index page
+    index_path = out.parent / "sephora_brand_dashboards_index.html"
+    brand_agg = _data["brand_agg"].set_index("brand")
+
+    rows_html = ""
+    for brand, filename in written:
+        try:
+            row = brand_agg.loc[brand]
+            n_rev = int(row["n_reviews"])
+            avg_rat = f"{row['avg_rating']:.2f}"
+            avg_sent = f"{row['avg_sentiment']:.3f}"
+            mismatch = f"{row['total_mismatch_rate']:.1%}"
+            vd_label = row.get("value_driver_label", "N/A") or "N/A"
+            cc_label = row.get("complaint_concentration_label", "N/A") or "N/A"
+        except Exception:
+            n_rev, avg_rat, avg_sent, mismatch, vd_label, cc_label = "—", "—", "—", "—", "—", "—"
+
+        rows_html += (
+            f"<tr>"
+            f"<td><a href='brand_dashboards/{filename}'>{brand}</a></td>"
+            f"<td>{n_rev:,}</td>"
+            f"<td>{avg_rat}</td>"
+            f"<td>{avg_sent}</td>"
+            f"<td>{mismatch}</td>"
+            f"<td>{vd_label}</td>"
+            f"<td>{cc_label}</td>"
+            f"</tr>\n"
+        )
+
+    index_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sephora Brand Health — Dashboard Index</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; max-width: 1200px; margin: 40px auto; padding: 0 20px; color: #2C3E50; }}
+    h1 {{ color: #2C3E50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
+    p.subtitle {{ color: #7f8c8d; margin-top: -8px; }}
+    input {{ width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box;
+             border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
+    th {{ background: #2C3E50; color: white; padding: 10px; text-align: left; position: sticky; top: 0; }}
+    td {{ padding: 8px 10px; border-bottom: 1px solid #ecf0f1; }}
+    tr:hover td {{ background: #f0f4f8; }}
+    a {{ color: #3498db; text-decoration: none; }}
+    a:hover {{ text-decoration: underline; }}
+  </style>
+</head>
+<body>
+  <h1>Sephora Brand Health — Dashboard Index</h1>
+  <p class="subtitle">{len(written)} brands &nbsp;|&nbsp; Click any brand name to open its full 12-panel dashboard</p>
+  <input type="text" id="search" placeholder="Filter brands..." onkeyup="filterTable()">
+  <table id="brandTable">
+    <thead>
+      <tr>
+        <th>Brand</th>
+        <th>Reviews</th>
+        <th>Avg Rating</th>
+        <th>Avg Sentiment</th>
+        <th>Mismatch Rate</th>
+        <th>Value Driver</th>
+        <th>Complaint Pattern</th>
+      </tr>
+    </thead>
+    <tbody>
+{rows_html}    </tbody>
+  </table>
+  <script>
+    function filterTable() {{
+      const q = document.getElementById("search").value.toLowerCase();
+      document.querySelectorAll("#brandTable tbody tr").forEach(row => {{
+        row.style.display = row.cells[0].textContent.toLowerCase().includes(q) ? "" : "none";
+      }});
+    }}
+  </script>
+</body>
+</html>"""
+
+    index_path.write_text(index_html, encoding="utf-8")
+    print(f"\nIndex page written: {index_path}")
+    print(f"Done. {len(written)}/{len(brands)} brand dashboards saved.")
+    return index_path
+
+
 def show_overview():
-    """Show the brand health overview scatter in a notebook."""
+    """Show the brand health overview scatter inline in a notebook."""
     _load_data()
     fig = _build_overview(_data["brand_agg"])
     fig.show()
@@ -773,11 +940,14 @@ def show_overview():
 
 def show_dashboard():
     """
-    Launch the interactive brand health dashboard in a notebook.
+    Launch the interactive brand health dashboard in a Jupyter notebook.
     Dropdown toggles between ALL qualifying Sephora brands.
+    Requires a running Jupyter server with ipywidgets enabled.
+
+    For browser access without a notebook, use write_all_brand_htmls() instead.
 
     Usage:
-        from sephora_brand_health import show_dashboard
+        from sephora_sentiment import show_dashboard
         show_dashboard()
     """
 
