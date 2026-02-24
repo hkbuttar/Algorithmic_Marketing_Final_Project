@@ -444,6 +444,8 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   │   └── 3-4_convergent_strategic_recommendation.ipynb
 │   ├── independent/
 │   │   ├── outputs/
+│   │   │   ├── brand_dashboards/
+│   │   │   ├── product_dashboards/
 │   │   │   ├── sephora_segmentation/
 │   │   │   │   ├── gmm_uw_bic_aic_silhouette.png
 │   │   │   │   ├── gmm_w_bic_aic_silhouette.png
