@@ -1,12 +1,37 @@
 # src/joint_recommendations.py
-# 2.5 — Combined Recommendation Engine (Sephora + Ulta)
-
-#   Write dashboards (first 200):
+# 2.5 — Joint Recommendation Engine (Sephora + Ulta)
+#
+# Architecture:
+#   Loads BOTH segmentation CSVs, merges into a single joint catalog, builds
+#   a shared feature space (Sephora skin-tone cols + Ulta verification cols,
+#   zero-filled where absent), computes cross-catalog cosine similarities,
+#   and generates recommendations that can span both retailers.
+#
+#   Deduplication: matched_products.csv / matched_pairs.csv are used to
+#   identify products that are the same item sold at both retailers. When
+#   building recommendations for product X, any cross-retailer match of X
+#   is always excluded from the results — you will never be recommended the
+#   same product you already have under a different retailer.
+#
+# Consumes:
+#   data/processed/Sephora/sephora_segmentation.csv
+#   data/processed/Ulta/ulta_segmentation.csv
+#   data/processed/Matched/matched_pairs.csv       (sephora_product_id, ulta_product_id, similarity_score)
+#   data/processed/Matched/matched_products.csv    (product_id, retailer, product_name, brand, …)
+#
+# Outputs:
+#   data/processed/Joint/joint_recommendations.csv
+#
+# Usage:
+#   As script:
+#     python src/joint_recommendations.py build_csv
 #     python src/joint_recommendations.py write_htmls --limit 200
 #
-#   Notebook dropdown:
-#     from src.joint_recommendations import show_dashboard
-#     show_dashboard()
+#   As import:
+#     from src.joint_recommendations import run_pipeline      # build CSV
+#     from src.joint_recommendations import show_dashboard    # Jupyter dropdown
+#     from src.joint_recommendations import write_product_html
+#     from src.joint_recommendations import write_all_product_htmls
 
 import re
 import time
@@ -15,296 +40,561 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import StandardScaler
 
 warnings.filterwarnings("ignore")
 
-# -------------------------------------------------
-# Paths
-# -------------------------------------------------
-_SCRIPT_DIR = Path(__file__).resolve().parent
+# ── Paths ──────────────────────────────────────────────────────────────────────
+_SCRIPT_DIR   = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent
 
-DATA_DIR = _PROJECT_ROOT / "data" / "processed"
-MATCHED_DIR = DATA_DIR / "Matched"
-SEPHORA_DIR = DATA_DIR / "Sephora"
-ULTA_DIR = DATA_DIR / "Ulta"
-JOINT_DIR = DATA_DIR / "Joint"
-JOINT_RECS_PATH = JOINT_DIR / "joint_recommendations.csv"
+DATA_DIR      = _PROJECT_ROOT / "data" / "processed"
+SEPHORA_DIR   = DATA_DIR / "Sephora"
+ULTA_DIR      = DATA_DIR / "Ulta"
+MATCHED_DIR   = DATA_DIR / "Matched"
+JOINT_DIR     = DATA_DIR / "Joint"
 
-OUTPUT_DIR = _PROJECT_ROOT / "notebooks" / "joint" / "outputs"
+JOINT_RECS_PATH       = JOINT_DIR / "joint_recommendations.csv"
+OUTPUT_DIR            = _PROJECT_ROOT / "notebooks" / "joint" / "outputs"
 PRODUCT_DASHBOARD_DIR = OUTPUT_DIR / "product_dashboards"
 
-TOP_N_SUB = 5
-TOP_N_COMP = 5
+MIN_REVIEWS = 20
+TOP_N_SUB   = 5
+TOP_N_COMP  = 5
 TOP_N_TRADE = 3
 
-_data = {}
+# Retailer display config
+_THEME = {
+    "sephora": dict(
+        color        = "#2d6a4f",
+        header_fill  = "#1a1a1a",
+        hover_bg     = "#f0f4f8",
+        link_color   = "#2d6a4f",
+        h1_color     = "#2C3E50",
+        h1_border    = "#2d6a4f",
+        has_verif    = False,
+    ),
+    "ulta": dict(
+        color        = "#880e4f",
+        header_fill  = "#880e4f",
+        hover_bg     = "#fdf0f5",
+        link_color   = "#880e4f",
+        h1_color     = "#880e4f",
+        h1_border    = "#880e4f",
+        has_verif    = True,
+    ),
+}
+
+_data: dict = {}
 
 
-# -------------------------------------------------
-# Helpers
-# -------------------------------------------------
-def _slug(text):
+# ══════════════════════════════════════════════════════════════════════════════
+# HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _slug(text: str) -> str:
     return re.sub(r"[^\w\-]", "_", str(text)).strip("_")
 
 
-def _to_string(s: pd.Series) -> pd.Series:
-    # robust string coercion (prevents float-vs-str merge errors)
+def _to_str(s: pd.Series) -> pd.Series:
     return s.astype("string")
 
 
-# -------------------------------------------------
-# A) PIPELINE: build joint_recommendations.csv
-# -------------------------------------------------
+def _safe_float(v, default=0.0) -> float:
+    try:
+        return float(pd.to_numeric(v, errors="coerce") or default)
+    except Exception:
+        return default
+
+
+def _safe_int(v, default=0) -> int:
+    try:
+        return int(pd.to_numeric(v, errors="coerce") or default)
+    except Exception:
+        return default
+
+
+def _verif_color(vb: float, disc: float) -> str:
+    if disc > 0.20: return "#e67e22"   # seeded
+    if vb  > 0.20: return "#27ae60"   # organic verified
+    return "#3498db"                   # low
+
+
+def _verif_tag(vb: float, disc: float) -> str:
+    if disc > 0.20: return f"Seeded {disc:.0%}"
+    if vb  > 0.20: return f"Verified {vb:.0%}"
+    return "Low verif."
+
+
+def _retailer_badge(retailer: str) -> str:
+    if retailer == "ulta":
+        return "<span style='background:#880e4f;color:white;padding:1px 6px;border-radius:3px;font-size:10px;'>ULTA</span>"
+    return "<span style='background:#2d6a4f;color:white;padding:1px 6px;border-radius:3px;font-size:10px;'>SEPHORA</span>"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CROSS-MATCH LOOKUP  (product_id → set of excluded product_ids)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _build_exclusion_map(matched_pairs: pd.DataFrame) -> dict:
+    """
+    Returns {product_id_str: {matched_id_str, ...}}
+    A product should never recommend its own cross-retailer match.
+    """
+    excl: dict = {}
+    for _, row in matched_pairs.iterrows():
+        s = str(row.get("sephora_product_id", ""))
+        u = str(row.get("ulta_product_id",   ""))
+        if s and u:
+            excl.setdefault(s, set()).add(u)
+            excl.setdefault(u, set()).add(s)
+    return excl
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FEATURE BLOCKS  (joint, retailer-aware)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _build_feature_blocks(df: pd.DataFrame):
+    """
+    Build feature blocks on the combined (Sephora + Ulta) catalog.
+    Sephora-only and Ulta-only columns are zero-filled for the other retailer.
+    """
+    blocks = {}
+
+    # ── A. Structural ─────────────────────────────────────────────────────────
+    cat_dummies = pd.get_dummies(df["category"], prefix="cat").astype(float)
+
+    # Sephora skin signals (zero for Ulta rows)
+    skin_cols = [c for c in df.columns if
+                 c.startswith("pct_skin_tone_") or c.startswith("pct_skin_type_")
+                 or c in ("pct_has_skin_tone", "pct_has_skin_type")]
+    skin_block = df[skin_cols].fillna(0) if skin_cols else pd.DataFrame(index=df.index)
+
+    # Ulta verification signals (zero for Sephora rows)
+    verif_cols = [c for c in ("pct_verified_buyer", "pct_verified_reviewer",
+                               "pct_would_recommend", "pct_has_disclosure",
+                               "helpfulness_rate") if c in df.columns]
+    verif_block = df[verif_cols].fillna(0) if verif_cols else pd.DataFrame(index=df.index)
+
+    structural = pd.concat([cat_dummies, skin_block, verif_block], axis=1).fillna(0)
+    blocks["structural"] = structural.values
+    print(f"    A. Structural:  {structural.shape[1]} features  "
+          f"({len(skin_cols)} skin · {len(verif_cols)} verif)")
+
+    # ── B. Sentiment ──────────────────────────────────────────────────────────
+    sentiment_cols = [c for c in (
+        "avg_sentiment", "sentiment_std", "pct_positive", "pct_negative", "pct_neutral",
+        "avg_rating", "rating_std",
+        "pct_5_star", "pct_4_star", "pct_3_star", "pct_2_star", "pct_1_star",
+        "rating_dispersion_over_time",
+    ) if c in df.columns]
+    if "avg_rating" in df.columns and "avg_sentiment" in df.columns:
+        df = df.copy()
+        df["rating_sentiment_mismatch"] = abs(
+            (df["avg_rating"] - 1) / 4 - (df["avg_sentiment"] + 1) / 2
+        )
+        sentiment_cols.append("rating_sentiment_mismatch")
+    blocks["sentiment"] = df[sentiment_cols].fillna(0).values
+    print(f"    B. Sentiment:   {len(sentiment_cols)} features")
+
+    # ── C. Content (LDA topics) ───────────────────────────────────────────────
+    topic_dummies = pd.DataFrame(index=df.index)
+    if "dominant_topic_mode" in df.columns:
+        topic_dummies = pd.get_dummies(
+            df["dominant_topic_mode"].astype(int), prefix="dom_topic"
+        ).astype(float)
+    topic_extra = df[["top_topic_prevalence"]].fillna(0) \
+        if "top_topic_prevalence" in df.columns else pd.DataFrame(index=df.index)
+    content = pd.concat([topic_dummies, topic_extra], axis=1).fillna(0)
+    blocks["content"] = content.values
+    print(f"    C. Content:     {content.shape[1]} features")
+
+    # ── D. Price ──────────────────────────────────────────────────────────────
+    price_f = pd.DataFrame(index=df.index)
+    if "price" in df.columns:
+        price_f["log_price"]    = np.log1p(df["price"].fillna(0))
+        price_f["price_pctile"] = df["price"].rank(pct=True)
+    if "price_vs_category_median" in df.columns:
+        price_f["price_vs_cat"] = df["price_vs_category_median"].fillna(1.0)
+    blocks["price"] = price_f.fillna(0).values
+    print(f"    D. Price:       {price_f.shape[1]} features")
+
+    return blocks, df
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SIMILARITIES
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _compute_similarities(blocks: dict) -> dict:
+    sims, scaler = {}, StandardScaler()
+    for name, matrix in blocks.items():
+        if matrix.shape[1] == 0:
+            continue
+        scaled = scaler.fit_transform(np.nan_to_num(matrix, 0))
+        sim = cosine_similarity(scaled)
+        np.fill_diagonal(sim, 0)
+        sims[name] = sim
+        print(f"    {name:<15} → {sim.shape[0]}×{sim.shape[1]}")
+    return sims
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCORES
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _compute_scores(sims: dict, df: pd.DataFrame):
+    """
+    Joint scoring. Substitutes prioritise same category across both retailers.
+    Complements are explicitly cross-category (cross-retailer is a bonus, not required).
+    """
+    n          = len(df)
+    content    = sims.get("content",    np.zeros((n, n)))
+    sentiment  = sims.get("sentiment",  np.zeros((n, n)))
+    price_sim  = sims.get("price",      np.zeros((n, n)))
+    structural = sims.get("structural", np.zeros((n, n)))
+
+    cat_arr  = np.array(df["category"].values)
+    same_cat = (cat_arr[:, None] == cat_arr[None, :]).astype(float)
+    cross_cat = 1.0 - same_cat * 0.5
+
+    ret_arr   = np.array(df["retailer"].values)
+    same_ret  = (ret_arr[:, None] == ret_arr[None, :]).astype(float)
+    diff_ret  = 1.0 - same_ret                # bonus for cross-retailer recs
+
+    rc        = df["review_count"].fillna(0).values.astype(float)
+    stability = np.sqrt(rc) / (np.sqrt(rc).max() + 1e-8)
+    penalty   = 1.0 - (rc < MIN_REVIEWS).astype(float) * 0.7
+    tw        = stability * penalty
+
+    # Substitutes — same category, either retailer
+    # structural includes verification (Ulta) so alignment on trust profile matters
+    sub  = (0.35 * content + 0.25 * sentiment + 0.20 * structural
+            + 0.10 * price_sim + 0.10 * same_cat)
+    sub *= (same_cat * 0.5 + 0.5)   # same-category boost
+    sub *= tw[np.newaxis, :]
+
+    # Complements — cross-category; slight nudge toward cross-retailer discovery
+    comp  = (0.35 * content + 0.25 * sentiment + 0.20 * structural
+             + 0.15 * cross_cat + 0.05 * diff_ret)
+    comp *= cross_cat
+    comp *= tw[np.newaxis, :]
+
+    # Trade — same category, content + sentiment + structural, price filter applied below
+    base      = (0.50 * content + 0.30 * sentiment + 0.20 * structural)
+    base     *= (same_cat * 0.7 + 0.3) * tw[np.newaxis, :]
+    prices    = df["price"].fillna(0).values.astype(float)
+    trade_up  = base * (prices[np.newaxis, :] > prices[:, np.newaxis] * 1.15).astype(float)
+    trade_dn  = base * (prices[np.newaxis, :] < prices[:, np.newaxis] * 0.85).astype(float)
+
+    return sub, comp, trade_up, trade_dn
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CSV GENERATION  (with cross-match deduplication)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _generate_csv(df: pd.DataFrame, sub, comp, trade_up, trade_dn,
+                  excl_map: dict) -> pd.DataFrame:
+    """
+    excl_map: {product_id_str: {excluded_id_str, ...}}
+    For each source product, any id in its exclusion set is skipped when
+    selecting top-N recommendations (cross-retailer duplicates).
+    """
+    n        = len(df)
+    name_col = "product_name" if "product_name" in df.columns else "name"
+
+    pids     = df["product_id"].astype(str).values
+    names    = df[name_col].fillna("").values if name_col in df.columns else [""] * n
+    brands   = df["brand"].fillna("").values  if "brand"   in df.columns else [""] * n
+    cats     = df["category"].fillna("").values
+    rets     = df["retailer"].fillna("").values
+    prices   = df["price"].fillna(0).values.astype(float)
+    ratings  = df["avg_rating"].fillna(0).values.astype(float)
+    sents    = df["avg_sentiment"].fillna(0).values.astype(float)
+    rcounts  = df["review_count"].fillna(0).values.astype(int)
+
+    vb   = df["pct_verified_buyer"].fillna(0).values  if "pct_verified_buyer"  in df.columns else np.zeros(n)
+    disc = df["pct_has_disclosure"].fillna(0).values  if "pct_has_disclosure"  in df.columns else np.zeros(n)
+
+    # pid → column index for fast exclusion lookup
+    pid_to_idx = {pids[j]: j for j in range(n)}
+
+    rows = []
+    for i in range(n):
+        src_pid  = pids[i]
+        excluded = excl_map.get(src_pid, set()) | {src_pid}  # always exclude self too
+
+        row = dict(
+            product_id    = src_pid,
+            product_name  = names[i],
+            brand         = brands[i],
+            category      = cats[i],
+            retailer      = rets[i],
+            price         = prices[i],
+            avg_rating    = ratings[i],
+            avg_sentiment = sents[i],
+            review_count  = int(rcounts[i]),
+            pct_verified_buyer = round(float(vb[i]),   4),
+            pct_has_disclosure = round(float(disc[i]), 4),
+        )
+
+        for prefix, matrix, top_n in [
+            ("sub",     sub,      TOP_N_SUB),
+            ("comp",    comp,     TOP_N_COMP),
+            ("tradeup", trade_up, TOP_N_TRADE),
+            ("tradedn", trade_dn, TOP_N_TRADE),
+        ]:
+            # Sort all products descending; skip excluded; take top_n
+            sorted_j = np.argsort(matrix[i])[::-1]
+            selected = []
+            for j in sorted_j:
+                if pids[j] in excluded:
+                    continue
+                selected.append(j)
+                if len(selected) == top_n:
+                    break
+
+            for rank, j in enumerate(selected):
+                p = f"{prefix}_{rank+1}_"
+                row[p+"id"]              = pids[j]
+                row[p+"name"]            = names[j]
+                row[p+"brand"]           = brands[j]
+                row[p+"retailer"]        = rets[j]
+                row[p+"score"]           = round(float(matrix[i, j]), 4)
+                row[p+"price"]           = prices[j]
+                row[p+"sentiment"]       = round(sents[j],   3)
+                row[p+"category"]        = cats[j]
+                row[p+"rating"]          = round(ratings[j], 2)
+                row[p+"reviews"]         = int(rcounts[j])
+                row[p+"verified_buyer"]  = round(float(vb[j]),   4)
+                row[p+"disclosure"]      = round(float(disc[j]), 4)
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PIPELINE
+# ══════════════════════════════════════════════════════════════════════════════
+
 def run_pipeline():
     """
-    Build joint_recommendations.csv by attaching cross-retailer match info
-    to BOTH Sephora and Ulta catalogs, then concat.
-    This is the part that answers your lead: YES, it uses matched_products.
+    Build joint_recommendations.csv from scratch:
+      1. Load both segmentation CSVs and tag with retailer column
+      2. Load matched_pairs for cross-match deduplication
+      3. Merge into one joint catalog (shared feature space, zero-filled)
+      4. Build features, compute similarities, score
+      5. Generate CSV — cross-retailer duplicates excluded from every product's recs
     """
     t0 = time.time()
     JOINT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Load datasets
-    sephora_recs = pd.read_csv(SEPHORA_DIR / "sephora_recommendations.csv")
-    ulta_recs = pd.read_csv(ULTA_DIR / "ulta_recommendations.csv")
+    print("█" * 70)
+    print("  JOINT RECOMMENDATION SYSTEM (2.5)")
+    print("█" * 70)
 
+    # ── 1. Load segmentations ─────────────────────────────────────────────────
+    print("\n  Loading segmentation files...")
+    seph = pd.read_csv(SEPHORA_DIR / "sephora_segmentation.csv")
+    ulta = pd.read_csv(ULTA_DIR    / "ulta_segmentation.csv")
+    seph["retailer"] = "sephora"
+    ulta["retailer"] = "ulta"
+    seph["product_id"] = _to_str(seph["product_id"])
+    ulta["product_id"] = _to_str(ulta["product_id"])
+
+    for df_r in (seph, ulta):
+        df_r["price"]        = pd.to_numeric(df_r["price"],        errors="coerce")
+        df_r["review_count"] = pd.to_numeric(df_r.get("review_count", 0), errors="coerce").fillna(0)
+
+    print(f"    Sephora: {len(seph):,} products × {seph.shape[1]} cols")
+    print(f"    Ulta:    {len(ulta):,} products × {ulta.shape[1]} cols")
+
+    # ── 2. Load cross-match data ───────────────────────────────────────────────
+    print("\n  Loading matched pairs...")
     matched_pairs = pd.read_csv(MATCHED_DIR / "matched_pairs.csv")
-    matched_products = pd.read_csv(MATCHED_DIR / "matched_products.csv")
+    matched_pairs["sephora_product_id"] = _to_str(matched_pairs["sephora_product_id"])
+    matched_pairs["ulta_product_id"]    = _to_str(matched_pairs["ulta_product_id"])
+    print(f"    {len(matched_pairs):,} cross-retailer matches loaded")
 
-    print("Loaded datasets:")
-    print("  Sephora recs:", sephora_recs.shape)
-    print("  Ulta recs:", ulta_recs.shape)
-    print("  Matched pairs:", matched_pairs.shape)
-    print("  Matched products:", matched_products.shape)
+    excl_map = _build_exclusion_map(matched_pairs)
+    print(f"    {len(excl_map):,} products have at least one cross-match to exclude")
 
-    # Normalize IDs to string (critical)
-    sephora_recs["product_id"] = _to_string(sephora_recs["product_id"])
-    ulta_recs["product_id"] = _to_string(ulta_recs["product_id"])
+    # ── 3. Merge into joint catalog ────────────────────────────────────────────
+    print("\n  Merging into joint catalog...")
+    # Rename Ulta name column if needed
+    for df_r in (seph, ulta):
+        if "name" in df_r.columns and "product_name" not in df_r.columns:
+            df_r.rename(columns={"name": "product_name"}, inplace=True)
 
-    # Cross-retailer mapping table
-    cross_map = matched_pairs[["sephora_product_id", "ulta_product_id", "similarity_score"]].copy()
-    cross_map["sephora_product_id"] = _to_string(cross_map["sephora_product_id"])
-    cross_map["ulta_product_id"] = _to_string(cross_map["ulta_product_id"])
-    print("Cross-retailer matches:", cross_map.shape)
+    combined = pd.concat([seph, ulta], ignore_index=True, sort=False).fillna(0)
+    # Restore proper NaN for price (filled 0 is fine for ranking; flag for display)
+    combined["price"] = pd.to_numeric(combined["price"], errors="coerce")
+    print(f"    Joint catalog: {len(combined):,} products × {combined.shape[1]} cols")
 
-    sephora_to_ulta = dict(zip(cross_map["sephora_product_id"], cross_map["ulta_product_id"]))
-    ulta_to_sephora = dict(zip(cross_map["ulta_product_id"], cross_map["sephora_product_id"]))
+    # ── 4. Build features ─────────────────────────────────────────────────────
+    print("\n  Building feature blocks...")
+    blocks, combined = _build_feature_blocks(combined)
 
-    # Build basic lookup tables from matched_products (THIS is what your lead asked about)
-    matched_products["product_id"] = _to_string(matched_products["product_id"])
+    print("\n  Computing similarities...")
+    sims = _compute_similarities(blocks)
 
-    # Sephora basic info
-    sephora_basic = matched_products[matched_products["retailer"] == "sephora"][
-        ["product_id", "product_name", "brand", "category", "price", "rating"]
-    ].copy()
-    sephora_basic = sephora_basic.rename(
-        columns={
-            "product_id": "matched_sephora_id",
-            "product_name": "matched_sephora_name",
-            "brand": "matched_sephora_brand",
-            "category": "matched_sephora_category",
-            "price": "matched_sephora_price",
-            "rating": "matched_sephora_rating",
-        }
-    )
-    sephora_basic["matched_sephora_id"] = _to_string(sephora_basic["matched_sephora_id"])
+    print("\n  Computing scores...")
+    sub, comp, trade_up, trade_dn = _compute_scores(sims, combined)
 
-    # Ulta basic info
-    ulta_basic = matched_products[matched_products["retailer"] == "ulta"][
-        ["product_id", "product_name", "brand", "category", "price", "rating"]
-    ].copy()
-    ulta_basic = ulta_basic.rename(
-        columns={
-            "product_id": "matched_ulta_id",
-            "product_name": "matched_ulta_name",
-            "brand": "matched_ulta_brand",
-            "category": "matched_ulta_category",
-            "price": "matched_ulta_price",
-            "rating": "matched_ulta_rating",
-        }
-    )
-    ulta_basic["matched_ulta_id"] = _to_string(ulta_basic["matched_ulta_id"])
+    print("\n  Generating recommendations CSV (with cross-match deduplication)...")
+    recs_df = _generate_csv(combined, sub, comp, trade_up, trade_dn, excl_map)
 
-    # -------------------------------------------------
-    # Sephora -> attach matched Ulta info
-    # -------------------------------------------------
-    sephora_joint = sephora_recs.copy()
-    sephora_joint["matched_ulta_id"] = _to_string(
-        sephora_joint["product_id"].map(sephora_to_ulta)
-    )
+    # ── 5. Validate ───────────────────────────────────────────────────────────
+    print(f"\n  {'─'*60}")
+    print("  VALIDATION")
 
-    sephora_joint = sephora_joint.merge(ulta_basic, on="matched_ulta_id", how="left")
-    print("Sephora joint shape:", sephora_joint.shape)
-    print("Sephora matched rows:", int(sephora_joint["matched_ulta_id"].notna().sum()))
+    # Confirm no cross-match duplicates slipped through
+    pid_to_retailer = dict(zip(combined["product_id"].astype(str), combined["retailer"]))
+    dup_found = 0
+    for _, row in recs_df.iterrows():
+        src = str(row["product_id"])
+        excluded = excl_map.get(src, set())
+        for prefix, top_n in [("sub",TOP_N_SUB),("comp",TOP_N_COMP),
+                               ("tradeup",TOP_N_TRADE),("tradedn",TOP_N_TRADE)]:
+            for rk in range(1, top_n + 1):
+                rid = str(row.get(f"{prefix}_{rk}_id",""))
+                if rid in excluded:
+                    dup_found += 1
+    print(f"  Cross-match duplicates in recs: {dup_found}  (should be 0)")
 
-    sephora_joint["price"] = pd.to_numeric(sephora_joint.get("price", np.nan), errors="coerce")
-    sephora_joint["matched_ulta_price"] = pd.to_numeric(sephora_joint.get("matched_ulta_price", np.nan), errors="coerce")
-    sephora_joint["avg_rating"] = pd.to_numeric(sephora_joint.get("avg_rating", np.nan), errors="coerce")
-    sephora_joint["matched_ulta_rating"] = pd.to_numeric(sephora_joint.get("matched_ulta_rating", np.nan), errors="coerce")
+    # Same-category rate for substitutes
+    total, same = 0, 0
+    id_to_cat = dict(zip(combined["product_id"].astype(str), combined["category"]))
+    for _, row in recs_df.iterrows():
+        src_cat = id_to_cat.get(str(row["product_id"]), "")
+        for rk in range(1, TOP_N_SUB + 1):
+            sid = row.get(f"sub_{rk}_id")
+            if pd.notna(sid):
+                total += 1
+                if id_to_cat.get(str(sid), "") == src_cat:
+                    same += 1
+    if total:
+        print(f"  Substitute same-category rate: {same/total*100:.1f}%")
 
-    sephora_joint["price_diff_vs_ulta"] = sephora_joint["price"] - sephora_joint["matched_ulta_price"]
-    sephora_joint["rating_diff_vs_ulta"] = sephora_joint["avg_rating"] - sephora_joint["matched_ulta_rating"]
+    # Cross-retailer coverage in substitutes
+    cross_ret = 0
+    for _, row in recs_df.iterrows():
+        src_ret = str(row.get("retailer", ""))
+        for rk in range(1, TOP_N_SUB + 1):
+            rret = str(row.get(f"sub_{rk}_retailer",""))
+            if rret and rret != src_ret:
+                cross_ret += 1
+    total_sub_slots = len(recs_df) * TOP_N_SUB
+    print(f"  Cross-retailer substitutes:    {cross_ret:,}/{total_sub_slots:,} "
+          f"({cross_ret/total_sub_slots*100:.1f}%)")
 
-    sephora_joint["ulta_cheaper"] = sephora_joint["price_diff_vs_ulta"] > 0
-    sephora_joint["ulta_higher_rated"] = sephora_joint["rating_diff_vs_ulta"] < 0
-
-    def _tag_sephora(r):
-        if pd.isna(r["matched_ulta_id"]) or str(r["matched_ulta_id"]) in ("<NA>", "nan"):
-            return "no_cross_match"
-        if r["ulta_cheaper"] and r["ulta_higher_rated"]:
-            return "ulta_better_and_cheaper"
-        if r["ulta_cheaper"]:
-            return "ulta_trade_down"
-        if r["ulta_higher_rated"]:
-            return "ulta_trade_up"
-        return "similar"
-
-    sephora_joint["cross_platform_signal"] = sephora_joint.apply(_tag_sephora, axis=1)
-    print("Sephora cross_platform_signal counts:")
-    print(sephora_joint["cross_platform_signal"].value_counts())
-
-    sephora_joint["retailer"] = "sephora"
-
-    # -------------------------------------------------
-    # Ulta -> attach matched Sephora info
-    # -------------------------------------------------
-    ulta_joint = ulta_recs.copy()
-    ulta_joint["matched_sephora_id"] = _to_string(
-        ulta_joint["product_id"].map(ulta_to_sephora)
-    )
-
-    ulta_joint = ulta_joint.merge(sephora_basic, on="matched_sephora_id", how="left")
-    print("Ulta joint shape:", ulta_joint.shape)
-    print("Ulta matched rows:", int(ulta_joint["matched_sephora_id"].notna().sum()))
-
-    ulta_joint["price"] = pd.to_numeric(ulta_joint.get("price", np.nan), errors="coerce")
-    ulta_joint["matched_sephora_price"] = pd.to_numeric(ulta_joint.get("matched_sephora_price", np.nan), errors="coerce")
-    ulta_joint["avg_rating"] = pd.to_numeric(ulta_joint.get("avg_rating", np.nan), errors="coerce")
-    ulta_joint["matched_sephora_rating"] = pd.to_numeric(ulta_joint.get("matched_sephora_rating", np.nan), errors="coerce")
-
-    ulta_joint["price_diff_vs_sephora"] = ulta_joint["price"] - ulta_joint["matched_sephora_price"]
-    ulta_joint["rating_diff_vs_sephora"] = ulta_joint["avg_rating"] - ulta_joint["matched_sephora_rating"]
-
-    ulta_joint["sephora_cheaper"] = ulta_joint["price_diff_vs_sephora"] > 0
-    ulta_joint["sephora_higher_rated"] = ulta_joint["rating_diff_vs_sephora"] < 0
-
-    def _tag_ulta(r):
-        if pd.isna(r["matched_sephora_id"]) or str(r["matched_sephora_id"]) in ("<NA>", "nan"):
-            return "no_cross_match"
-        if r["sephora_cheaper"] and r["sephora_higher_rated"]:
-            return "sephora_better_and_cheaper"
-        if r["sephora_cheaper"]:
-            return "sephora_trade_down"
-        if r["sephora_higher_rated"]:
-            return "sephora_trade_up"
-        return "similar"
-
-    ulta_joint["cross_platform_signal"] = ulta_joint.apply(_tag_ulta, axis=1)
-    print("Ulta cross_platform_signal counts:")
-    print(ulta_joint["cross_platform_signal"].value_counts())
-
-    ulta_joint["retailer"] = "ulta"
-
-    # Save outputs
-    sephora_out = JOINT_DIR / "joint_recommendations_sephora_view.csv"
-    ulta_out = JOINT_DIR / "joint_recommendations_ulta_view.csv"
-
-    sephora_joint.to_csv(sephora_out, index=False)
-    ulta_joint.to_csv(ulta_out, index=False)
-
-    combined = pd.concat([sephora_joint, ulta_joint], ignore_index=True)
-    combined.to_csv(JOINT_RECS_PATH, index=False)
-
-    print("Saved:")
-    print(" -", sephora_out)
-    print(" -", ulta_out)
-    print(" -", JOINT_RECS_PATH)
-    print("Combined shape:", combined.shape)
-    print(f"Done in {time.time() - t0:.1f}s")
+    recs_df.to_csv(JOINT_RECS_PATH, index=False)
+    print(f"\n  ✓ Saved: {JOINT_RECS_PATH}  ({recs_df.shape})")
+    print(f"  Done in {time.time()-t0:.1f}s")
+    print(f"\n  Notebook:  show_dashboard()")
+    print(f"  Browser:   write_all_product_htmls(limit=200)")
+    print(f"\n{'█'*70}\n")
 
 
-# -------------------------------------------------
-# B) DASHBOARD: load from joint_recommendations.csv
-# -------------------------------------------------
+# ══════════════════════════════════════════════════════════════════════════════
+# DATA LOADING  (lazy)
+# ══════════════════════════════════════════════════════════════════════════════
+
 def _load_data():
     if _data:
         return
 
-    t0 = time.time()
     if not JOINT_RECS_PATH.exists():
         raise FileNotFoundError(
-            f"Missing {JOINT_RECS_PATH}. Run: python src/joint_recommendations.py build_csv"
+            f"Missing {JOINT_RECS_PATH}\n"
+            "Run:  python src/joint_recommendations.py build_csv"
         )
 
-    print("Loading JOINT recommendation data from CSV...")
+    t0   = time.time()
+    print("Loading joint recommendation data...")
     recs = pd.read_csv(JOINT_RECS_PATH)
-    recs["product_id"] = _to_string(recs["product_id"])
-
+    recs["product_id"] = _to_str(recs["product_id"])
     if "retailer" not in recs.columns:
         recs["retailer"] = "unknown"
 
     _data["recs"] = recs
 
-    # Build dropdown list
     products = []
     for _, row in recs.iterrows():
-        brand = str(row.get("brand", ""))
-        name = str(row.get("product_name", ""))
-        price = float(pd.to_numeric(row.get("price", 0), errors="coerce") or 0)
-        ret = str(row.get("retailer", "")).lower()
-        label = f"[{ret}] {brand} — {name} (${price:.0f})"
+        ret   = str(row.get("retailer","")).lower()
+        brand = str(row.get("brand",""))
+        name  = str(row.get("product_name",""))
+        price = _safe_float(row.get("price", 0))
+        label = f"[{ret.upper()}] {brand} — {name} (${price:.0f})"
         products.append((label, str(row["product_id"])))
     products.sort(key=lambda x: x[0])
     _data["product_list"] = products
 
-    print(f"  Loaded {len(products):,} products in {time.time() - t0:.1f}s")
+    print(f"  Loaded {len(products):,} products in {time.time()-t0:.1f}s")
 
 
-def _extract_items(row, prefix, top_n, include_verif=False):
+# ══════════════════════════════════════════════════════════════════════════════
+# ITEM EXTRACTION  (shared by dashboard + export)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _extract_items(row: pd.Series, prefix: str, top_n: int) -> tuple:
     items = []
     for rk in range(1, top_n + 1):
-        n = row.get(f"{prefix}_{rk}_name", "")
-        if pd.isna(n) or n == "":
+        nm = row.get(f"{prefix}_{rk}_name", "")
+        if pd.isna(nm) or nm == "":
             continue
+        ret    = str(row.get(f"{prefix}_{rk}_retailer", "")).lower()
+        vb_v   = _safe_float(row.get(f"{prefix}_{rk}_verified_buyer", 0))
+        disc_v = _safe_float(row.get(f"{prefix}_{rk}_disclosure",     0))
+        items.append(dict(
+            name    = str(nm),
+            brand   = str(row.get(f"{prefix}_{rk}_brand",     "")),
+            retailer= ret,
+            price   = _safe_float(row.get(f"{prefix}_{rk}_price",     0)),
+            sent    = _safe_float(row.get(f"{prefix}_{rk}_sentiment",  0)),
+            score   = _safe_float(row.get(f"{prefix}_{rk}_score",      0)),
+            cat     = str(row.get(f"{prefix}_{rk}_category", "")),
+            rating  = _safe_float(row.get(f"{prefix}_{rk}_rating",     0)),
+            reviews = _safe_int(  row.get(f"{prefix}_{rk}_reviews",    0)),
+            vb      = vb_v,
+            disc    = disc_v,
+            vtag    = _verif_tag(vb_v, disc_v) if ret == "ulta" else "",
+        ))
 
-        it = dict(
-            name=str(n),
-            brand=str(row.get(f"{prefix}_{rk}_brand", "")),
-            price=float(pd.to_numeric(row.get(f"{prefix}_{rk}_price", 0), errors="coerce") or 0),
-            sent=float(pd.to_numeric(row.get(f"{prefix}_{rk}_sentiment", 0), errors="coerce") or 0),
-            score=float(pd.to_numeric(row.get(f"{prefix}_{rk}_score", 0), errors="coerce") or 0),
-            cat=str(row.get(f"{prefix}_{rk}_category", "")),
-            rating=float(pd.to_numeric(row.get(f"{prefix}_{rk}_rating", 0), errors="coerce") or 0),
-            reviews=int(pd.to_numeric(row.get(f"{prefix}_{rk}_reviews", 0), errors="coerce") or 0),
-        )
+    ret_label = {
+        "sephora": "<b style='color:#2d6a4f'>[S]</b>",
+        "ulta":    "<b style='color:#880e4f'>[U]</b>",
+    }
+    short = [f"#{i+1} {ret_label.get(it['retailer'],'')} {it['brand'][:14]}"
+             for i, it in enumerate(items)]
+    hover = []
+    for it in items:
+        tag  = f"[{it['retailer'].upper()}] " if it["retailer"] else ""
+        h    = (f"<b>{tag}{it['brand']}</b><br>{it['name']}<br>"
+                f"Category: {it['cat']}<br>"
+                f"${it['price']:.0f} · ★{it['rating']:.2f} · Sent {it['sent']:.3f}<br>"
+                f"{it['reviews']:,} reviews · Score {it['score']:.4f}")
+        if it["retailer"] == "ulta" and it["vtag"]:
+            h += f"<br><b>{it['vtag']}</b>"
+        hover.append(h)
 
-        if include_verif:
-            vb_val = float(pd.to_numeric(row.get(f"{prefix}_{rk}_verified_buyer", 0), errors="coerce") or 0)
-            disc_val = float(pd.to_numeric(row.get(f"{prefix}_{rk}_disclosure", 0), errors="coerce") or 0)
-            if disc_val > 0.20:
-                vtag = f"Seeded {disc_val:.0%}"
-            elif vb_val > 0.20:
-                vtag = f"Verified {vb_val:.0%}"
-            else:
-                vtag = "Low verif."
-            it.update(vb=vb_val, disc=disc_val, vtag=vtag)
-
-        items.append(it)
-
-    short = [f"#{i+1} {it['brand'][:18]}" for i, it in enumerate(items)]
-    hover = [
-        f"<b>{it['brand']}</b><br>{it['name']}<br>"
-        f"Category: {it['cat']}<br>"
-        f"${it['price']:.0f} · ★{it['rating']:.2f} · Sent {it['sent']:.3f}<br>"
-        f"{it['reviews']:,} reviews · Score {it['score']:.4f}"
-        + (f"<br><b>{it['vtag']}</b>" if include_verif else "")
-        for it in items
-    ]
     return items, short, hover
 
 
-def build_product_dashboard(product_id):
+# ══════════════════════════════════════════════════════════════════════════════
+# DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+
+def build_product_dashboard(product_id: str):
+    """
+    Build a cross-catalog recommendation dashboard for one product.
+    Recommendations can come from EITHER retailer; cross-retailer duplicates
+    are already excluded in the CSV. Ulta items show verification provenance;
+    Sephora items do not.
+    """
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
 
@@ -317,56 +607,52 @@ def build_product_dashboard(product_id):
         fig.add_annotation(text="Product not found", showarrow=False, font=dict(size=20))
         return fig
 
-    row = match.iloc[0]
+    row      = match.iloc[0]
     retailer = str(row.get("retailer", "")).lower()
+    theme    = _THEME.get(retailer, _THEME["sephora"])
 
-    # Theme by retailer
-    if retailer == "ulta":
-        theme_color = "#880e4f"
-        header_fill = "#880e4f"
-        include_verif = True
-    else:
-        theme_color = "#2d6a4f"
-        header_fill = "#1a1a1a"
-        include_verif = False
+    src_price = _safe_float(row.get("price",         0))
+    src_sent  = _safe_float(row.get("avg_sentiment", 0))
+    src_vb    = _safe_float(row.get("pct_verified_buyer", 0))
+    src_disc  = _safe_float(row.get("pct_has_disclosure",  0))
 
     fig = make_subplots(
         rows=4, cols=2,
         subplot_titles=(
-            "Close Substitutes — Price",
-            "Close Substitutes — Sentiment",
-            "Complements — Price",
-            "Complements — Sentiment",
-            "Trade-Up — Price",
-            "Trade-Down — Price",
-            "Avg Score by Intent",
-            "Cross-Retailer Match (if any)",
+            "Close Substitutes — Price",      "Close Substitutes — Sentiment",
+            "Complements — Price",            "Complements — Sentiment",
+            "Trade-Up — Price",               "Trade-Down — Price",
+            "Avg Score by Intent",            "All Recommendations",
         ),
-        vertical_spacing=0.10,
-        horizontal_spacing=0.20,
+        vertical_spacing=0.10, horizontal_spacing=0.20,
         row_heights=[0.30, 0.30, 0.20, 0.20],
         specs=[
-            [{"type": "bar"}, {"type": "bar"}],
-            [{"type": "bar"}, {"type": "bar"}],
-            [{"type": "bar"}, {"type": "bar"}],
-            [{"type": "bar"}, {"type": "table"}],
+            [{"type":"bar"},   {"type":"bar"}],
+            [{"type":"bar"},   {"type":"bar"}],
+            [{"type":"bar"},   {"type":"bar"}],
+            [{"type":"bar"},   {"type":"table"}],
         ],
     )
 
-    src_price = float(pd.to_numeric(row.get("price", 0), errors="coerce") or 0)
-    src_sent = float(pd.to_numeric(row.get("avg_sentiment", 0), errors="coerce") or 0)
+    def _bar_color(it: dict, fallback: str) -> str:
+        """Per-item color: Ulta items colored by verification, Sephora by theme."""
+        if it["retailer"] == "ulta":
+            return _verif_color(it["vb"], it["disc"])
+        return fallback
 
-    # Substitutes
-    items, short, hover = _extract_items(row, "sub", TOP_N_SUB, include_verif=include_verif)
+    # ── Row 1: Substitutes ──────────────────────────────────────────────────
+    items, short, hover = _extract_items(row, "sub", TOP_N_SUB)
     if items:
+        bar_cols = [_bar_color(it, theme["color"]) for it in items]
         fig.add_trace(go.Bar(
             y=short[::-1], x=[it["price"] for it in items][::-1], orientation="h",
-            marker_color=theme_color, showlegend=False,
+            marker_color=bar_cols[::-1], showlegend=False,
             text=[f"${it['price']:.0f}" for it in items][::-1],
             textposition="inside", textfont=dict(color="white", size=11),
             hovertext=hover[::-1], hoverinfo="text",
         ), row=1, col=1)
-        fig.add_shape(type="line", x0=src_price, x1=src_price, y0=-0.5, y1=len(items)-0.5,
+        fig.add_shape(type="line", x0=src_price, x1=src_price,
+                      y0=-0.5, y1=len(items)-0.5,
                       line=dict(color="red", dash="dash", width=2), row=1, col=1)
 
         colors_s = ["#27ae60" if it["sent"] >= src_sent else "#e74c3c" for it in items]
@@ -377,193 +663,212 @@ def build_product_dashboard(product_id):
             textposition="inside", textfont=dict(color="white", size=11),
             hovertext=hover[::-1], hoverinfo="text",
         ), row=1, col=2)
-        fig.add_shape(type="line", x0=src_sent, x1=src_sent, y0=-0.5, y1=len(items)-0.5,
+        fig.add_shape(type="line", x0=src_sent, x1=src_sent,
+                      y0=-0.5, y1=len(items)-0.5,
                       line=dict(color="red", dash="dash", width=2), row=1, col=2)
 
-    # Complements
-    items, short, hover = _extract_items(row, "comp", TOP_N_COMP, include_verif=include_verif)
+    # ── Row 2: Complements ──────────────────────────────────────────────────
+    items, short, hover = _extract_items(row, "comp", TOP_N_COMP)
     if items:
-        short_c = [f"#{i+1} {it['cat'][:20]}" for i, it in enumerate(items)]
+        short_c  = [f"#{i+1} {it['retailer'].upper()[:1]} {it['cat'][:18]}"
+                    for i, it in enumerate(items)]
+        bar_cols = [_bar_color(it, "#7b2d8b") for it in items]
         fig.add_trace(go.Bar(
             y=short_c[::-1], x=[it["price"] for it in items][::-1], orientation="h",
-            marker_color="#7b2d8b", showlegend=False,
+            marker_color=bar_cols[::-1], showlegend=False,
             text=[f"${it['price']:.0f}" for it in items][::-1],
             textposition="inside", textfont=dict(color="white", size=11),
             hovertext=hover[::-1], hoverinfo="text",
         ), row=2, col=1)
-
         fig.add_trace(go.Bar(
             y=short_c[::-1], x=[it["sent"] for it in items][::-1], orientation="h",
-            marker_color="#7b2d8b", showlegend=False, opacity=0.7,
+            marker_color=bar_cols[::-1], showlegend=False, opacity=0.75,
             text=[f"{it['sent']:.3f}" for it in items][::-1],
             textposition="inside", textfont=dict(color="white", size=11),
             hovertext=hover[::-1], hoverinfo="text",
         ), row=2, col=2)
 
-    # Trade-Up / Trade-Down
-    items, short, hover = _extract_items(row, "tradeup", TOP_N_TRADE, include_verif=include_verif)
-    if items:
-        fig.add_trace(go.Bar(
-            y=short[::-1], x=[it["price"] for it in items][::-1], orientation="h",
-            marker_color="#1a73e8", showlegend=False,
-            text=[f"${it['price']:.0f} (+${it['price']-src_price:.0f})" for it in items][::-1],
-            textposition="inside", textfont=dict(color="white", size=11),
-            hovertext=hover[::-1], hoverinfo="text",
-        ), row=3, col=1)
-        fig.add_shape(type="line", x0=src_price, x1=src_price, y0=-0.5, y1=len(items)-0.5,
-                      line=dict(color="red", dash="dash", width=2), row=3, col=1)
+    # ── Row 3: Trade-Up / Trade-Down ───────────────────────────────────────
+    for intent, base_col, col_n in [("tradeup","#1a73e8",1), ("tradedn","#e67700",2)]:
+        items, short, hover = _extract_items(row, intent, TOP_N_TRADE)
+        if items:
+            bar_cols = [_bar_color(it, base_col) for it in items]
+            sign     = "+" if intent == "tradeup" else "-"
+            texts    = [f"${it['price']:.0f} ({sign}${abs(it['price']-src_price):.0f})"
+                        for it in items]
+            fig.add_trace(go.Bar(
+                y=short[::-1], x=[it["price"] for it in items][::-1], orientation="h",
+                marker_color=bar_cols[::-1], showlegend=False,
+                text=texts[::-1], textposition="inside",
+                textfont=dict(color="white", size=11),
+                hovertext=hover[::-1], hoverinfo="text",
+            ), row=3, col=col_n)
+            fig.add_shape(type="line", x0=src_price, x1=src_price,
+                          y0=-0.5, y1=len(items)-0.5,
+                          line=dict(color="red", dash="dash", width=2), row=3, col=col_n)
 
-    items, short, hover = _extract_items(row, "tradedn", TOP_N_TRADE, include_verif=include_verif)
-    if items:
-        fig.add_trace(go.Bar(
-            y=short[::-1], x=[it["price"] for it in items][::-1], orientation="h",
-            marker_color="#e67700", showlegend=False,
-            text=[f"${it['price']:.0f} (-${src_price-it['price']:.0f})" for it in items][::-1],
-            textposition="inside", textfont=dict(color="white", size=11),
-            hovertext=hover[::-1], hoverinfo="text",
-        ), row=3, col=2)
-        fig.add_shape(type="line", x0=src_price, x1=src_price, y0=-0.5, y1=len(items)-0.5,
-                      line=dict(color="red", dash="dash", width=2), row=3, col=2)
-
-    # Avg score by intent
+    # ── Row 4, Col 1: Avg score by intent ──────────────────────────────────
     intent_names, intent_scores = [], []
-    for prefix, label, top_n in [
-        ("sub", "Substitutes", TOP_N_SUB),
-        ("comp", "Complements", TOP_N_COMP),
-        ("tradeup", "Trade-Up", TOP_N_TRADE),
-        ("tradedn", "Trade-Down", TOP_N_TRADE),
-    ]:
-        sc = [float(pd.to_numeric(row.get(f"{prefix}_{rk}_score", 0), errors="coerce") or 0) for rk in range(1, top_n + 1)]
+    for prefix, label, top_n in [("sub","Substitutes",TOP_N_SUB),
+                                  ("comp","Complements",TOP_N_COMP),
+                                  ("tradeup","Trade-Up",TOP_N_TRADE),
+                                  ("tradedn","Trade-Down",TOP_N_TRADE)]:
+        sc = [_safe_float(row.get(f"{prefix}_{rk}_score", 0)) for rk in range(1, top_n+1)]
         intent_names.append(label)
         intent_scores.append(float(np.mean(sc)) if sc else 0.0)
 
     fig.add_trace(go.Bar(
         x=intent_names, y=intent_scores,
-        marker_color=["#2d6a4f", "#7b2d8b", "#1a73e8", "#e67700"],
+        marker_color=["#2d6a4f","#7b2d8b","#1a73e8","#e67700"],
         text=[f"{s:.4f}" for s in intent_scores], textposition="auto",
         showlegend=False,
     ), row=4, col=1)
 
-    # Cross-retailer match table (based on columns created in run_pipeline)
-    if retailer == "ulta":
-        mid = row.get("matched_sephora_id", "")
-        mname = row.get("matched_sephora_name", "")
-        mbrand = row.get("matched_sephora_brand", "")
-        mcat = row.get("matched_sephora_category", "")
-        mprice = row.get("matched_sephora_price", np.nan)
-        mrating = row.get("matched_sephora_rating", np.nan)
-        other = "Sephora"
-    else:
-        mid = row.get("matched_ulta_id", "")
-        mname = row.get("matched_ulta_name", "")
-        mbrand = row.get("matched_ulta_brand", "")
-        mcat = row.get("matched_ulta_category", "")
-        mprice = row.get("matched_ulta_price", np.nan)
-        mrating = row.get("matched_ulta_rating", np.nan)
-        other = "Ulta"
+    # ── Row 4, Col 2: Full detail table ────────────────────────────────────
+    t_intent=[];t_ret=[];t_brand=[];t_name=[];t_cat=[];t_price=[];t_score=[];t_verif=[]
+    for prefix, ilabel, top_n in [("sub","Substitute",TOP_N_SUB),
+                                   ("comp","Complement",TOP_N_COMP),
+                                   ("tradeup","Trade-Up",TOP_N_TRADE),
+                                   ("tradedn","Trade-Down",TOP_N_TRADE)]:
+        for rk in range(1, top_n + 1):
+            nm = row.get(f"{prefix}_{rk}_name", "")
+            if pd.isna(nm) or nm == "":
+                continue
+            t_intent.append(ilabel)
+            t_ret.append(  str(row.get(f"{prefix}_{rk}_retailer", "")).upper()[:1])
+            t_brand.append(str(row.get(f"{prefix}_{rk}_brand",    ""))[:18])
+            t_name.append( str(nm)[:26])
+            t_cat.append(  str(row.get(f"{prefix}_{rk}_category", ""))[:16])
+            t_price.append(f"${_safe_float(row.get(f'{prefix}_{rk}_price',0)):.0f}")
+            t_score.append(f"{_safe_float(row.get(f'{prefix}_{rk}_score', 0)):.4f}")
+            vb_v   = _safe_float(row.get(f"{prefix}_{rk}_verified_buyer", 0))
+            disc_v = _safe_float(row.get(f"{prefix}_{rk}_disclosure",     0))
+            ret_v  = str(row.get(f"{prefix}_{rk}_retailer","")).lower()
+            if ret_v == "ulta":
+                t_verif.append("Seeded" if disc_v > 0.2 else
+                                "Verified" if vb_v > 0.2 else "Low")
+            else:
+                t_verif.append("—")
 
-    if pd.isna(mid) or str(mid) in ("<NA>", "nan", ""):
-        header_vals = ["Cross-Match", "", "", "", "", ""]
-        table_vals = [["No cross-retailer match found"], [""], [""], [""], [""], [""]]
-    else:
-        header_vals = ["Retailer", "Brand", "Product", "Category", "Price", "Rating"]
-        table_vals = [
-            [other],
-            [str(mbrand)],
-            [str(mname)[:40]],
-            [str(mcat)[:30]],
-            [f"${float(pd.to_numeric(mprice, errors='coerce')):.0f}" if pd.notna(mprice) else "—"],
-            [f"{float(pd.to_numeric(mrating, errors='coerce')):.2f}" if pd.notna(mrating) else "—"],
-        ]
+    ic = {"Substitute":"#e8f5e9","Complement":"#f3e5f5",
+          "Trade-Up":"#e3f2fd","Trade-Down":"#fff3e0"}
+    fc = [ic.get(i,"#fff") for i in t_intent]
 
     fig.add_trace(go.Table(
-        header=dict(values=header_vals, font=dict(size=10, color="white"),
-                    fill_color=header_fill, align="left"),
-        cells=dict(values=table_vals, font=dict(size=9),
-                   fill_color="#fff", align="left"),
+        header=dict(
+            values=["Intent","Rtlr","Brand","Product","Cat.","Price","Score","Verif."],
+            font=dict(size=9, color="white"),
+            fill_color=theme["header_fill"], align="left",
+        ),
+        cells=dict(
+            values=[t_intent,t_ret,t_brand,t_name,t_cat,t_price,t_score,t_verif],
+            font=dict(size=8),
+            fill_color=[fc]*8, align="left",
+        ),
     ), row=4, col=2)
 
-    # KPI title
-    product_name = row.get("product_name", "")
-    brand = row.get("brand", "")
-    category = row.get("category", "")
-    rating = float(pd.to_numeric(row.get("avg_rating", 0), errors="coerce") or 0)
-    sentiment = float(pd.to_numeric(row.get("avg_sentiment", 0), errors="coerce") or 0)
-    review_count = int(pd.to_numeric(row.get("review_count", 0), errors="coerce") or 0)
+    # ── KPI header ─────────────────────────────────────────────────────────
+    brand        = str(row.get("brand",""))
+    product_name = str(row.get("product_name",""))
+    category     = str(row.get("category",""))
+    rating       = _safe_float(row.get("avg_rating",   0))
+    review_count = _safe_int(  row.get("review_count", 0))
+
+    if retailer == "ulta":
+        if src_disc > 0.20:
+            verif_line = (f"<span style='font-size:11px;color:#880e4f;font-weight:bold;'>"
+                          f"⚠️ Seeded ({src_disc:.0%} disclosure)</span>")
+        elif src_vb > 0.20:
+            verif_line = (f"<span style='font-size:11px;color:#880e4f;font-weight:bold;'>"
+                          f"✓ Verified ({src_vb:.0%} buyers)</span>")
+        else:
+            verif_line = ("<span style='font-size:11px;color:#880e4f;'>"
+                          "○ Low verification</span>")
+        legend_line = (
+            "<span style='font-size:10px;color:#999;'>"
+            "Bars: "
+            "<span style='color:#27ae60;'>■</span> Organic "
+            "<span style='color:#e67e22;'>■</span> Seeded "
+            "<span style='color:#3498db;'>■</span> Low "
+            "<span style='color:#2d6a4f;'>■</span> Sephora &nbsp;|&nbsp; "
+            "<span style='color:red;'>---</span> Source &nbsp;|&nbsp; "
+            "Labels: [S]=Sephora [U]=Ulta</span>"
+        )
+        extra = f"{verif_line}<br>{legend_line}"
+    else:
+        extra = (
+            "<span style='font-size:10px;color:#999;'>"
+            "Red dashed = source product &nbsp;|&nbsp; "
+            "Labels: [S]=Sephora [U]=Ulta &nbsp;|&nbsp; "
+            "Hover bars for full details</span>"
+        )
 
     kpi = (
-        f"<b style='font-size:16px'>[{retailer.upper()}] {brand} — {product_name}</b><br>"
-        f"<span style='font-size:11px; color:#555;'>"
+        f"{_retailer_badge(retailer)} "
+        f"<b style='font-size:16px'>{brand} — {product_name}</b><br>"
+        f"<span style='font-size:11px;color:#555;'>"
         f"Category: {category} &nbsp;|&nbsp; "
         f"Price: ${src_price:.0f} &nbsp;|&nbsp; "
         f"Rating: {rating:.2f} &nbsp;|&nbsp; "
-        f"Sentiment: {sentiment:.3f} &nbsp;|&nbsp; "
+        f"Sentiment: {src_sent:.3f} &nbsp;|&nbsp; "
         f"Reviews: {review_count:,}</span><br>"
-        f"<span style='font-size:10px; color:#999;'>"
-        f"Red dashed = source product &nbsp;|&nbsp; Hover bars for details</span>"
+        f"{extra}"
     )
 
-    # Optional Ulta verification badge (only if columns exist)
-    if retailer == "ulta":
-        src_vb = float(pd.to_numeric(row.get("pct_verified_buyer", 0), errors="coerce") or 0)
-        src_disc = float(pd.to_numeric(row.get("pct_has_disclosure", 0), errors="coerce") or 0)
-        if src_disc > 0.20:
-            badge = f"⚠️ Seeded ({src_disc:.0%} disclosure)"
-        elif src_vb > 0.20:
-            badge = f"✓ Verified ({src_vb:.0%} buyers)"
-        else:
-            badge = "○ Low verification"
-        kpi += f"<br><span style='font-size:11px; color:#880e4f; font-weight:bold;'>{badge}</span>"
-
     fig.update_layout(
-        height=1800, width=1300,
+        height=1800, width=1350,
         title=dict(text=kpi, font=dict(size=12), x=0.01, y=0.99),
         template="plotly_white",
         showlegend=False,
-        margin=dict(t=110, l=160, r=40, b=30),
+        margin=dict(t=120, l=170, r=40, b=30),
     )
-    fig.update_yaxes(tickfont=dict(size=11))
+    fig.update_yaxes(tickfont=dict(size=10))
     return fig
 
 
-def write_product_html(product_id, output_dir=None):
-    _load_data()
-    import plotly.io as pio  # noqa: F401
+# ══════════════════════════════════════════════════════════════════════════════
+# BROWSER EXPORT
+# ══════════════════════════════════════════════════════════════════════════════
 
+def write_product_html(product_id: str, output_dir=None) -> Path:
+    """
+    Save a single product's joint recommendation dashboard as a self-contained
+    HTML file (no Jupyter required).
+    """
+    _load_data()
     out = Path(output_dir) if output_dir else PRODUCT_DASHBOARD_DIR
     out.mkdir(parents=True, exist_ok=True)
 
-    recs = _data["recs"]
+    recs  = _data["recs"]
     match = recs[recs["product_id"].astype(str) == str(product_id)]
     if len(match) > 0:
-        r = match.iloc[0]
-        retailer = str(r.get("retailer", ""))
-        brand = _slug(str(r.get("brand", "")))
-        name = _slug(str(r.get("product_name", product_id))[:40])
-        filename = f"{_slug(retailer)}_{brand}_{name}_{_slug(str(product_id))}.html"
+        r        = match.iloc[0]
+        retailer = _slug(str(r.get("retailer",      "")))
+        brand    = _slug(str(r.get("brand",         "")))
+        name     = _slug(str(r.get("product_name",  product_id))[:40])
+        filename = f"{retailer}_{brand}_{name}_{_slug(str(product_id))}.html"
     else:
         filename = f"{_slug(str(product_id))}.html"
 
-    fig = build_product_dashboard(product_id)
+    fig  = build_product_dashboard(product_id)
     path = out / filename
     fig.write_html(str(path), include_plotlyjs="cdn")
-    print(" ->", path)
+    print(f"  -> {path}")
     return path
 
 
-def write_all_product_htmls(output_dir=None, limit=None):
+def write_all_product_htmls(output_dir=None, limit: int = None) -> Path:
     """
-    Writes dashboards for all products (or first N if limit is set),
-    then writes index page to notebooks/joint/outputs/joint_product_dashboards_index.html
+    Write a dashboard HTML for every (or first `limit`) products, then build
+    a linked index page at notebooks/joint/outputs/joint_product_dashboards_index.html.
     """
     _load_data()
-    recs = _data["recs"]
-
-    out = Path(output_dir) if output_dir else PRODUCT_DASHBOARD_DIR
+    recs  = _data["recs"]
+    out   = Path(output_dir) if output_dir else PRODUCT_DASHBOARD_DIR
     out.mkdir(parents=True, exist_ok=True)
 
     total = len(recs) if limit is None else min(int(limit), len(recs))
-    print(f"Writing {total:,} joint product dashboards to {out}/")
+    print(f"Writing {total:,} joint dashboards to {out}/")
 
     written = []
     for i, (_, rec_row) in enumerate(recs.head(total).iterrows(), 1):
@@ -576,34 +881,52 @@ def write_all_product_htmls(output_dir=None, limit=None):
         if i % 200 == 0:
             print(f"  {i:,}/{total:,} complete...")
 
+    # ── Index page ─────────────────────────────────────────────────────────
     index_path = out.parent / "joint_product_dashboards_index.html"
+    rows_html  = ""
 
-    rows_html = ""
     for rec_row, filename in written:
-        retailer = str(rec_row.get("retailer", "")).lower()
-        brand = str(rec_row.get("brand", ""))
-        name = str(rec_row.get("product_name", ""))
-        category = str(rec_row.get("category", ""))
-        signal = str(rec_row.get("cross_platform_signal", ""))
+        retailer = str(rec_row.get("retailer","")).lower()
+        brand    = str(rec_row.get("brand",""))
+        name     = str(rec_row.get("product_name",""))
+        category = str(rec_row.get("category",""))
+        signal   = str(rec_row.get("cross_platform_signal","—"))
 
         try:
-            price = f"${float(pd.to_numeric(rec_row.get('price', 0), errors='coerce') or 0):.0f}"
-            rating = f"{float(pd.to_numeric(rec_row.get('avg_rating', 0), errors='coerce') or 0):.2f}"
-            sentiment = f"{float(pd.to_numeric(rec_row.get('avg_sentiment', 0), errors='coerce') or 0):.3f}"
-            reviews = f"{int(pd.to_numeric(rec_row.get('review_count', 0), errors='coerce') or 0):,}"
+            price     = f"${_safe_float(rec_row.get('price',         0)):.0f}"
+            rating    = f"{_safe_float(rec_row.get('avg_rating',     0)):.2f}"
+            sentiment = f"{_safe_float(rec_row.get('avg_sentiment',  0)):.3f}"
+            reviews   = f"{_safe_int(  rec_row.get('review_count',   0)):,}"
         except Exception:
             price = rating = sentiment = reviews = "—"
 
+        ret_badge = (
+            f"<span style='background:{'#880e4f' if retailer=='ulta' else '#2d6a4f'};"
+            f"color:white;padding:1px 5px;border-radius:3px;font-size:11px;'>"
+            f"{'ULTA' if retailer=='ulta' else 'SEPHORA'}</span>"
+        )
+
+        # Verification column (Ulta only)
+        vb   = _safe_float(rec_row.get("pct_verified_buyer", 0))
+        disc = _safe_float(rec_row.get("pct_has_disclosure",  0))
+        if retailer == "ulta":
+            if disc > 0.20:
+                vlabel, vcol = f"Seeded ({disc:.0%})", "#e67e22"
+            elif vb > 0.20:
+                vlabel, vcol = f"Verified ({vb:.0%})", "#27ae60"
+            else:
+                vlabel, vcol = "Low", "#3498db"
+            verif_cell = f"<td><span style='color:{vcol};font-weight:bold;'>{vlabel}</span></td>"
+        else:
+            verif_cell = "<td>—</td>"
+
         rows_html += (
             f"<tr>"
-            f"<td><a href='product_dashboards/{filename}'>[{retailer}] {brand}</a></td>"
-            f"<td>{name}</td>"
-            f"<td>{category}</td>"
-            f"<td>{price}</td>"
-            f"<td>{rating}</td>"
-            f"<td>{sentiment}</td>"
-            f"<td>{reviews}</td>"
-            f"<td>{signal}</td>"
+            f"<td>{ret_badge}</td>"
+            f"<td><a href='product_dashboards/{filename}'>{brand}</a></td>"
+            f"<td>{name}</td><td>{category}</td>"
+            f"<td>{price}</td><td>{rating}</td><td>{sentiment}</td><td>{reviews}</td>"
+            f"{verif_cell}"
             f"</tr>\n"
         )
 
@@ -614,37 +937,46 @@ def write_all_product_htmls(output_dir=None, limit=None):
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Joint Recommendations — Product Index</title>
   <style>
-    body {{ font-family: Arial, sans-serif; max-width: 1500px; margin: 40px auto; padding: 0 20px; color: #2C3E50; }}
-    h1 {{ color: #2C3E50; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; }}
-    p.subtitle {{ color: #7f8c8d; margin-top: -8px; }}
-    input {{ width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box;
-             border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-    th {{ background: #2C3E50; color: white; padding: 10px; text-align: left; position: sticky; top: 0; }}
-    td {{ padding: 8px 10px; border-bottom: 1px solid #ecf0f1; }}
-    tr:hover td {{ background: #f0f4f8; }}
-    a {{ color: #2C3E50; text-decoration: none; font-weight: bold; }}
-    a:hover {{ text-decoration: underline; }}
+    body  {{ font-family: Arial, sans-serif; max-width: 1500px; margin: 40px auto;
+             padding: 0 20px; color: #2C3E50; }}
+    h1    {{ color: #2C3E50; border-bottom: 3px solid #2C3E50; padding-bottom: 10px; }}
+    p.sub {{ color: #7f8c8d; margin-top: -8px; font-size:13px; }}
+    p.leg {{ font-size: 12px; }}
+    input {{ width:100%; padding:8px; margin-bottom:16px; box-sizing:border-box;
+             border:1px solid #ccc; border-radius:4px; font-size:14px; }}
+    table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+    th    {{ background:#2C3E50; color:white; padding:10px; text-align:left;
+             position:sticky; top:0; }}
+    td    {{ padding:7px 10px; border-bottom:1px solid #ecf0f1; }}
+    tr:hover td {{ background:#f5f5f5; }}
+    a     {{ color:#2C3E50; text-decoration:none; font-weight:bold; }}
+    a:hover {{ text-decoration:underline; }}
   </style>
 </head>
 <body>
   <h1>Joint Recommendations — Product Index</h1>
-  <p class="subtitle">
-    {len(written):,} products &nbsp;|&nbsp;
-    Click any brand to open its full recommendation dashboard (Sephora + Ulta)
+  <p class="sub">
+    {len(written):,} products (Sephora + Ulta) &nbsp;|&nbsp;
+    Click any brand to open its cross-catalog recommendation dashboard
   </p>
-  <input type="text" id="search" placeholder="Filter by retailer, brand, product, or category..." onkeyup="filterTable()">
+  <p class="leg">
+    <span style="background:#2d6a4f;color:white;padding:1px 5px;border-radius:3px;">SEPHORA</span>
+    &nbsp;
+    <span style="background:#880e4f;color:white;padding:1px 5px;border-radius:3px;">ULTA</span>
+    &nbsp;&nbsp; Ulta verification:
+    <span style="color:#27ae60;font-weight:bold;">■ Organic</span> &nbsp;
+    <span style="color:#e67e22;font-weight:bold;">■ Seeded</span> &nbsp;
+    <span style="color:#3498db;font-weight:bold;">■ Low</span>
+  </p>
+  <input type="text" id="search"
+         placeholder="Filter by retailer, brand, product, or category..."
+         onkeyup="filterTable()">
   <table id="productTable">
     <thead>
       <tr>
-        <th>Retailer + Brand</th>
-        <th>Product</th>
-        <th>Category</th>
-        <th>Price</th>
-        <th>Avg Rating</th>
-        <th>Avg Sentiment</th>
-        <th>Reviews</th>
-        <th>Cross Signal</th>
+        <th>Retailer</th><th>Brand</th><th>Product</th><th>Category</th>
+        <th>Price</th><th>Rating</th><th>Sentiment</th><th>Reviews</th>
+        <th>Verification</th>
       </tr>
     </thead>
     <tbody>
@@ -654,7 +986,7 @@ def write_all_product_htmls(output_dir=None, limit=None):
     function filterTable() {{
       const q = document.getElementById("search").value.toLowerCase();
       document.querySelectorAll("#productTable tbody tr").forEach(row => {{
-        const text = Array.from(row.cells).slice(0, 4).map(c => c.textContent).join(" ").toLowerCase();
+        const text = Array.from(row.cells).slice(0,4).map(c=>c.textContent).join(" ").toLowerCase();
         row.style.display = text.includes(q) ? "" : "none";
       }});
     }}
@@ -663,12 +995,20 @@ def write_all_product_htmls(output_dir=None, limit=None):
 </html>"""
 
     index_path.write_text(index_html, encoding="utf-8")
-    print("\nIndex page written:", index_path)
-    print(f"Done. {len(written):,}/{total:,} joint product dashboards saved.")
+    print(f"\nIndex page: {index_path}")
+    print(f"Done. {len(written):,}/{total:,} dashboards saved.")
     return index_path
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# JUPYTER DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+
 def show_dashboard():
+    """
+    Interactive Jupyter dropdown across the full joint catalog (Sephora + Ulta).
+    Requires ipywidgets. For browser export use write_all_product_htmls().
+    """
     import ipywidgets as widgets
     from IPython.display import display, HTML
 
@@ -676,20 +1016,19 @@ def show_dashboard():
     products = _data["product_list"]
 
     display(HTML(
-        "<h2 style='text-align:center; color:#2C3E50;'>"
-        "Joint Recommendations — Product Dashboard</h2>"
-        "<p style='text-align:center; color:#7f8c8d;'>"
-        f"Select from {len(products):,} products (Sephora + Ulta).</p>"
+        "<h2 style='text-align:center;color:#2C3E50;'>"
+        "Joint Recommendations — Sephora &amp; Ulta</h2>"
+        "<p style='text-align:center;color:#7f8c8d;'>"
+        f"Select from {len(products):,} products. "
+        "Recommendations span both catalogs; matched duplicates excluded.</p>"
     ))
 
     dropdown = widgets.Dropdown(
-        options=products,
-        value=products[0][1],
+        options=products, value=products[0][1],
         description="Product:",
-        style={"description_width": "initial"},
-        layout=widgets.Layout(width="700px"),
+        style={"description_width":"initial"},
+        layout=widgets.Layout(width="750px"),
     )
-
     output = widgets.Output()
 
     def on_change(change):
@@ -699,21 +1038,22 @@ def show_dashboard():
 
     dropdown.observe(on_change, names="value")
     display(dropdown, output)
-
     with output:
         build_product_dashboard(products[0][1]).show()
 
 
-# -------------------------------------------------
-# CLI entry
-# -------------------------------------------------
+# ══════════════════════════════════════════════════════════════════════════════
+# CLI
+# ══════════════════════════════════════════════════════════════════════════════
+
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Joint Recommendation Engine")
     parser.add_argument("cmd", nargs="?", default="help",
-                        choices=["help", "build_csv", "write_htmls"])
-    parser.add_argument("--limit", type=int, default=200)
+                        choices=["help","build_csv","write_htmls"])
+    parser.add_argument("--limit", type=int, default=200,
+                        help="Max products to export as HTML (default: 200)")
     args = parser.parse_args()
 
     if args.cmd == "build_csv":
@@ -724,5 +1064,6 @@ if __name__ == "__main__":
         print("Commands:")
         print("  python src/joint_recommendations.py build_csv")
         print("  python src/joint_recommendations.py write_htmls --limit 200")
-        print("Notebook:")
-        print("  from src.joint_recommendations import show_dashboard; show_dashboard()")
+        print("\nNotebook:")
+        print("  from src.joint_recommendations import show_dashboard")
+        print("  show_dashboard()")
