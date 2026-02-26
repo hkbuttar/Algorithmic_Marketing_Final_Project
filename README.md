@@ -556,8 +556,6 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 ```
 ---
 
----
-
 ## Code Reference
 
 This section documents every source file and notebook in the repository — what each one does, what it produces, and how to run it. Files are grouped by tier and ordered by intended execution sequence.
