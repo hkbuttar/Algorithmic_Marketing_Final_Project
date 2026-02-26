@@ -87,6 +87,7 @@ _THEME = {
 }
 
 _data: dict = {}
+_cat_to_gid = {}   # populated by _compute_scores; used by _generate_csv
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -95,6 +96,398 @@ _data: dict = {}
 
 def _slug(text: str) -> str:
     return re.sub(r"[^\w\-]", "_", str(text)).strip("_")
+
+
+# ── Category normalization & alias matching ──────────────────────────────────
+_CAT_RE = re.compile(r"[^\w\s]")
+
+
+def _norm_cat(s: str) -> str:
+    """Lowercase, strip punctuation, collapse whitespace."""
+    return " ".join(_CAT_RE.sub(" ", str(s).lower()).split())
+
+
+# Explicit cross-retailer aliases: Sephora and Ulta often name the same shelf
+# differently. Both sides are normalised before comparison.
+# Add more pairs here as you discover mismatches in the overlap report.
+# Each entry is a SET of all category names (Sephora + Ulta) that refer to
+# the same product shelf. All members share one group id. Built from the
+# actual unique category values in both segmentation CSVs.
+_CAT_GROUPS: list = [
+    # ── Fragrance ─────────────────────────────────────────────────────────
+    # S: Cologne, Cologne Gift Sets, Perfume, Perfume Gift Sets, Rollerballs & Travel Size,
+    #    Unisex / Genderless
+    # U: Cologne, Cologne Gift Sets, Fragrance, Fragrance Gifts, Perfume,
+    #    Unisex Fragrance, Women's Fragrance
+    {"cologne", "perfume", "fragrance",
+     "cologne gift sets", "perfume gift sets", "fragrance gifts",
+     "rollerballs  travel size", "rollerballs and travel size",
+     "unisex   genderless", "unisex fragrance", "women s fragrance",
+     "unisex genderless"},
+
+    # ── BB & CC Cream ─────────────────────────────────────────────────────
+    # S: BB & CC Cream   U: BB & CC Creams
+    {"bb   cc cream", "bb   cc creams"},
+
+    # ── Blush ─────────────────────────────────────────────────────────────
+    # S: Blush   U: Blush
+    {"blush"},
+
+    # ── Bronzer ───────────────────────────────────────────────────────────
+    # S: Bronzer   U: Bronzer
+    {"bronzer"},
+
+    # ── Highlighter ───────────────────────────────────────────────────────
+    # S: Highlighter   U: Highlighter
+    {"highlighter"},
+
+    # ── Concealer ─────────────────────────────────────────────────────────
+    # S: Concealer, Under-Eye Concealer   U: Concealer
+    {"concealer", "under eye concealer"},
+
+    # ── Contour ───────────────────────────────────────────────────────────
+    # S: Contour   U: Contouring
+    {"contour", "contouring"},
+
+    # ── Foundation ────────────────────────────────────────────────────────
+    # S: Foundation   U: Foundation
+    {"foundation"},
+
+    # ── Tinted Moisturizer ────────────────────────────────────────────────
+    # S: Tinted Moisturizer   U: Tinted Moisturizer
+    {"tinted moisturizer"},
+
+    # ── Color Correct ─────────────────────────────────────────────────────
+    # S: Color Correct   U: Color Correcting
+    {"color correct", "color correcting"},
+
+    # ── Face Primer ───────────────────────────────────────────────────────
+    # S: Face Primer   U: Face Primer
+    {"face primer"},
+
+    # ── Setting Spray & Powder ────────────────────────────────────────────
+    # S: Setting Spray & Powder   U: Setting Spray & Powder
+    {"setting spray   powder"},
+
+    # ── Cheek Palettes ────────────────────────────────────────────────────
+    # S: Cheek Palettes   (no Ulta equiv — solo group)
+    {"cheek palettes"},
+
+    # ── Eyeshadow ─────────────────────────────────────────────────────────
+    # S: Eyeshadow, Eye Palettes   U: Eyeshadow, Eyeshadow Palettes
+    {"eyeshadow", "eye palettes", "eyeshadow palettes"},
+
+    # ── Eyeliner ─────────────────────────────────────────────────────────
+    # S: Eyeliner   U: Eyeliner
+    {"eyeliner"},
+
+    # ── Mascara ───────────────────────────────────────────────────────────
+    # S: Mascara   U: Mascara
+    {"mascara"},
+
+    # ── Eyebrow ───────────────────────────────────────────────────────────
+    # S: Eyebrow   U: Eyebrows
+    {"eyebrow", "eyebrows"},
+
+    # ── False Eyelashes ───────────────────────────────────────────────────
+    # S: False Eyelashes   U: Eyelashes
+    {"false eyelashes", "eyelashes"},
+
+    # ── Eye Creams ────────────────────────────────────────────────────────
+    # S: Eye Creams & Treatments   U: Eye Cream, Eye Serums, Eye Treatments
+    {"eye creams   treatments", "eye cream", "eye serums", "eye treatments"},
+
+    # ── Eye Masks ─────────────────────────────────────────────────────────
+    # S: Eye Masks   U: Eye Masks
+    {"eye masks"},
+
+    # ── Lip Gloss ─────────────────────────────────────────────────────────
+    # S: Lip Gloss   U: Lip Gloss, Gloss & Shine
+    {"lip gloss", "gloss   shine"},
+
+    # ── Lipstick ──────────────────────────────────────────────────────────
+    # S: Lipstick, Liquid Lipstick   U: Lipstick
+    {"lipstick", "liquid lipstick"},
+
+    # ── Lip Liner ─────────────────────────────────────────────────────────
+    # S: Lip Liner   U: Lip Liner
+    {"lip liner"},
+
+    # ── Lip Oil ───────────────────────────────────────────────────────────
+    # S: Lip Oil   U: Lip Oil
+    {"lip oil"},
+
+    # ── Lip Balm ─────────────────────────────────────────────────────────
+    # S: Lip Balms & Treatments   U: Lip Balms
+    {"lip balms   treatments", "lip balms"},
+
+    # ── Lip Plumper ───────────────────────────────────────────────────────
+    # S: Lip Plumper   U: Lip Plumpers
+    {"lip plumper", "lip plumpers"},
+
+    # ── Lip Stain ─────────────────────────────────────────────────────────
+    # S: Lip Stain   U: Lip Stain
+    {"lip stain"},
+
+    # ── Makeup Palettes ───────────────────────────────────────────────────
+    # S: Makeup Palettes   U: Makeup Palettes
+    {"makeup palettes"},
+
+    # ── Makeup Removers ───────────────────────────────────────────────────
+    # S: Makeup Removers   U: Makeup Remover, Face Wipes
+    {"makeup removers", "makeup remover", "face wipes"},
+
+    # ── Moisturizers ─────────────────────────────────────────────────────
+    # S: Moisturizers, Face Creams, Night Creams
+    # U: Face Moisturizer, Moisturizers, Moisturizers & Treatments, Night Cream, Hydration
+    {"moisturizers", "face creams", "night creams",
+     "face moisturizer", "moisturizers   treatments", "night cream", "hydration"},
+
+    # ── Face Serums ───────────────────────────────────────────────────────
+    # S: Face Serums   U: Face Serums, Treatment & Serums, Treatments & Serums, Oils & Serums
+    {"face serums", "treatment   serums", "treatments   serums", "oils   serums",
+     "treatment", "treatments"},
+
+    # ── Face Oils ─────────────────────────────────────────────────────────
+    # S: Face Oils   U: Face Oils
+    {"face oils"},
+
+    # ── Face Masks ────────────────────────────────────────────────────────
+    # S: Face Masks   U: Face Masks, Masks
+    {"face masks", "masks"},
+
+    # ── Sheet Masks ───────────────────────────────────────────────────────
+    # S: Sheet Masks   U: Sheet Masks
+    {"sheet masks"},
+
+    # ── Cleansers ─────────────────────────────────────────────────────────
+    # S: Cleansers, Face Wash & Cleansers
+    # U: Cleansers, Face Wash, Cleansing Balms & Oils, Cleansing Exfoliators
+    {"cleansers", "face wash   cleansers", "face wash",
+     "cleansing balms   oils", "cleansing exfoliators"},
+
+    # ── Exfoliators ───────────────────────────────────────────────────────
+    # S: Exfoliators, Facial Peels, Scrub & Exfoliants
+    # U: Face Peels & Exfoliators, Cleansing Exfoliators, Body Scrubs & Exfoliants
+    {"exfoliators", "facial peels", "scrub   exfoliants",
+     "face peels   exfoliators"},
+
+    # ── Toners ────────────────────────────────────────────────────────────
+    # S: Toners, Mists & Essences   U: Toner, Face Mists & Essences
+    {"toners", "toner", "mists   essences", "face mists   essences"},
+
+    # ── Sunscreen ─────────────────────────────────────────────────────────
+    # S: Face Sunscreen   U: Sunscreen
+    {"face sunscreen", "sunscreen"},
+
+    # ── Anti-Aging ────────────────────────────────────────────────────────
+    # S: Anti-Aging   U: Anti-Aging
+    {"anti aging"},
+
+    # ── Blemish & Acne ────────────────────────────────────────────────────
+    # S: Blemish & Acne Treatments   U: Acne & Blemish Treatments
+    {"blemish   acne treatments", "acne   blemish treatments"},
+
+    # ── Decollete & Neck ─────────────────────────────────────────────────
+    # S: Decollete & Neck Creams   U: Neck Cream
+    {"decollete   neck creams", "neck cream"},
+
+    # ── Scalp ────────────────────────────────────────────────────────────
+    # S: Scalp Treatments   U: Scalp Care
+    {"scalp treatments", "scalp care"},
+
+    # ── Shampoo ───────────────────────────────────────────────────────────
+    # S: Shampoo   U: Shampoo, Co-Wash, Dry Shampoo (only exact match here)
+    {"shampoo"},
+
+    # ── Dry Shampoo ───────────────────────────────────────────────────────
+    # S: Dry Shampoo   U: Dry Shampoo
+    {"dry shampoo"},
+
+    # ── Conditioner ───────────────────────────────────────────────────────
+    # S: Conditioner   U: Conditioner
+    {"conditioner"},
+
+    # ── Leave-In Conditioner ─────────────────────────────────────────────
+    # S: Leave-In Conditioner   U: Leave-In Conditioner, Leave-In Treatment
+    {"leave in conditioner", "leave in treatment"},
+
+    # ── Hair Masks ────────────────────────────────────────────────────────
+    # S: Hair Masks   U: (no exact, but Masks overlaps)
+    {"hair masks"},
+
+    # ── Hair Oil ─────────────────────────────────────────────────────────
+    # S: Hair Oil   U: (none exact — solo)
+    {"hair oil"},
+
+    # ── Hair Styling Products ────────────────────────────────────────────
+    # S: Hair Styling Products, Hair Styling & Treatments, Hair Spray, Hair Primers
+    # U: Styling Products, Styling, Hairspray, Heat Protectant, Wax & Pomade,
+    #    Volume & Texture, Smoothing, Curl Enhancing
+    {"hair styling products", "hair styling   treatments", "hair spray", "hair primers",
+     "styling products", "styling", "hairspray", "heat protectant",
+     "wax   pomade", "volume   texture", "smoothing", "curl enhancing"},
+
+    # ── Hair Dryers ───────────────────────────────────────────────────────
+    # S: Hair Dryers   U: Hair Dryers
+    {"hair dryers"},
+
+    # ── Curling Irons ─────────────────────────────────────────────────────
+    # S: Curling Irons   U: Curling Irons & Stylers
+    {"curling irons", "curling irons   stylers"},
+
+    # ── Flat Irons ────────────────────────────────────────────────────────
+    # S: Hair Straighteners & Flat Irons   U: Flat Irons
+    {"hair straighteners   flat irons", "flat irons"},
+
+    # ── Hair Brushes & Combs ─────────────────────────────────────────────
+    # S: Brushes & Combs   U: Hair Brushes & Combs
+    {"brushes   combs", "hair brushes   combs"},
+
+    # ── Hair Color ────────────────────────────────────────────────────────
+    # S: Hair Dye & Root Touch-Ups   U: Hair Color, Hair Color & Bleach, Root Touch Up
+    {"hair dye   root touch ups", "hair color", "hair color   bleach", "root touch up"},
+
+    # ── Hair Supplements ─────────────────────────────────────────────────
+    # S: Hair Supplements   U: Hair Thinning & Hair Loss
+    {"hair supplements", "hair thinning   hair loss"},
+
+    # ── Body Lotion ───────────────────────────────────────────────────────
+    # S: Body Lotions & Body Oils   U: Body Lotion, Body Lotion & Creams, Body Lotions, Body Butters
+    {"body lotions   body oils", "body lotion", "body lotion   creams",
+     "body lotions", "body butters"},
+
+    # ── Body Wash ─────────────────────────────────────────────────────────
+    # S: Body Wash & Shower Gel   U: Shower Gel & Body Wash
+    {"body wash   shower gel", "shower gel   body wash"},
+
+    # ── Body Scrubs ───────────────────────────────────────────────────────
+    # S: Scrub & Exfoliants   U: Body Scrubs & Exfoliants
+    {"scrub   exfoliants", "body scrubs   exfoliants"},
+
+    # ── Body Serums ───────────────────────────────────────────────────────
+    # S: For Body   U: Body Serums & Oils, Body Treatments
+    {"for body", "body serums   oils", "body treatments"},
+
+    # ── Body Mist ────────────────────────────────────────────────────────
+    # S: Body Mist & Hair Mist   U: Body Mist & Hair Mist
+    {"body mist   hair mist"},
+
+    # ── Bath Soaks ────────────────────────────────────────────────────────
+    # S: Bath Soaks & Bubble Bath   U: Bubble Bath & Soaks, Bath Bombs & Shower Steamers
+    {"bath soaks   bubble bath", "bubble bath   soaks", "bath bombs   shower steamers"},
+
+    # ── Hand & Foot ───────────────────────────────────────────────────────
+    # S: Hand Cream & Foot Cream   U: Hand Cream & Foot Cream, Hand & Foot Treatment
+    {"hand cream   foot cream", "hand   foot treatment"},
+
+    # ── Hand Soap & Sanitizer ─────────────────────────────────────────────
+    # S: Hand Sanitizer & Hand Soap   U: Hand Soap & Sanitizers
+    {"hand sanitizer   hand soap", "hand soap   sanitizers"},
+
+    # ── Deodorant ────────────────────────────────────────────────────────
+    # S: Deodorant & Antiperspirant   U: Deodorant
+    {"deodorant   antiperspirant", "deodorant"},
+
+    # ── Candles ───────────────────────────────────────────────────────────
+    # S: Candles   U: Candles & Home Fragrance
+    {"candles", "candles   home fragrance"},
+
+    # ── Makeup Brushes ────────────────────────────────────────────────────
+    # S: Face Brushes   U: Makeup Brushes, Brush Sets
+    {"face brushes", "makeup brushes", "brush sets"},
+
+    # ── Brush Cleaners ────────────────────────────────────────────────────
+    # S: Brush Cleaners   U: Brush Cleaner
+    {"brush cleaners", "brush cleaner"},
+
+    # ── Sponges & Applicators ────────────────────────────────────────────
+    # S: Sponges & Applicators   U: Sponges & Applicators
+    {"sponges   applicators"},
+
+    # ── Face Brushes/Tools ───────────────────────────────────────────────
+    # S: Facial Cleansing Brushes   U: Cleansing Brushes, Facial Rollers, Skincare Tools
+    {"facial cleansing brushes", "cleansing brushes", "facial rollers", "skincare tools"},
+
+    # ── Beauty Supplements ───────────────────────────────────────────────
+    # S: Beauty Supplements   U: Beauty Supplements, Daily Vitamins & Supplements, Supplements
+    {"beauty supplements", "daily vitamins   supplements", "supplements"},
+
+    # ── Nail ─────────────────────────────────────────────────────────────
+    # S: Nail   U: Nail Polish, Nail Care, Gel Nail Polish, Top & Base Coats,
+    #              Nail Art & Design, Press On Nails, Nail Polish Stickers
+    {"nail", "nail polish", "nail care", "gel nail polish",
+     "top   base coats", "nail art   design", "press on nails",
+     "nail polish stickers"},
+
+    # ── Accessories ──────────────────────────────────────────────────────
+    # S: Accessories   U: Accessories
+    {"accessories"},
+
+    # ── Hair Accessories ─────────────────────────────────────────────────
+    # S: Hair Clips & Claw Clips, Scrunchies & Hair Ties
+    # U: Clips & Bobby Pins, Elastics, Headbands, Styling Accessories
+    {"hair clips   claw clips", "scrunchies   hair ties",
+     "clips   bobby pins", "elastics", "headbands", "styling accessories"},
+
+    # ── Intimate Care ────────────────────────────────────────────────────
+    # S: Intimate Care   U: Intimate Wellness, Sexual Wellness
+    {"intimate care", "intimate wellness", "sexual wellness"},
+
+    # ── Self-Tanner ───────────────────────────────────────────────────────
+    # S: (none)   U: Self-Tanning & Bronzing, After Sun Care
+    {"self tanning   bronzing", "after sun care"},
+]
+
+_CAT_GROUP: dict = {}
+for _gid, _group_set in enumerate(_CAT_GROUPS):
+    for _cat in _group_set:
+        _n = _norm_cat(_cat)
+        _CAT_GROUP.setdefault(_n, _gid)
+
+
+def _same_category(a: str, b: str) -> bool:
+    """True if two category strings refer to the same product shelf."""
+    na, nb = _norm_cat(a), _norm_cat(b)
+    if na == nb:
+        return True
+    ga, gb = _CAT_GROUP.get(na), _CAT_GROUP.get(nb)
+    return ga is not None and ga == gb
+
+
+def _build_gid_arr(cat_values) -> "np.ndarray":
+    """
+    Convert an array of category strings into a group-ID integer array.
+    Products in the same category (or alias group) get the same integer.
+    Populates the module-level _cat_to_gid dict as a side-effect so that
+    _generate_csv can reuse it for O(1) per-product checks.
+    Returns a numpy int32 array of length len(cat_values).
+    """
+    global _cat_to_gid
+    _cat_to_gid = {}
+    next_gid = [0]
+
+    def _gid_for(nc: str) -> int:
+        if nc in _cat_to_gid:
+            return _cat_to_gid[nc]
+        ag = _CAT_GROUP.get(nc)
+        if ag is not None:
+            existing = [_cat_to_gid[c] for c in _cat_to_gid if _CAT_GROUP.get(c) == ag]
+            gid = existing[0] if existing else next_gid[0]
+            if not existing:
+                next_gid[0] += 1
+        else:
+            gid = next_gid[0]
+            next_gid[0] += 1
+        _cat_to_gid[nc] = gid
+        return gid
+
+    # Two-pass: first populate dict with all unique cats, then build array
+    unique = list(dict.fromkeys(_norm_cat(c) for c in cat_values))
+    for uc in unique:
+        _gid_for(uc)
+
+    return np.array([_cat_to_gid[_norm_cat(c)] for c in cat_values], dtype=np.int32)
 
 
 def _to_str(s: pd.Series) -> pd.Series:
@@ -247,8 +640,15 @@ def _compute_similarities(blocks: dict) -> dict:
 
 def _compute_scores(sims: dict, df: pd.DataFrame):
     """
-    Joint scoring. Substitutes prioritise same category across both retailers.
-    Complements are explicitly cross-category (cross-retailer is a bonus, not required).
+    Joint scoring — ALL four intents are strictly same-category.
+
+    same_cat is multiplied into every score matrix so off-category pairs are
+    zeroed at the matrix level. _generate_csv additionally checks cats[j] != src_cat
+    as a belt-and-suspenders guard during top-N selection.
+
+    Complements (within same category) are differentiated from Substitutes by
+    relying more on content/topic divergence — e.g., a concealer recommended
+    alongside a foundation, both in Face Makeup.
     """
     n          = len(df)
     content    = sims.get("content",    np.zeros((n, n)))
@@ -256,9 +656,12 @@ def _compute_scores(sims: dict, df: pd.DataFrame):
     price_sim  = sims.get("price",      np.zeros((n, n)))
     structural = sims.get("structural", np.zeros((n, n)))
 
-    cat_arr  = np.array(df["category"].values)
-    same_cat = (cat_arr[:, None] == cat_arr[None, :]).astype(float)
-    cross_cat = 1.0 - same_cat * 0.5
+    # Build same_cat matrix — O(n), vectorised.
+    # _build_gid_arr populates module-level _cat_to_gid and returns an int array.
+    # same_cat[i,j]==1 iff products i and j share a category (exact or alias).
+    gid_arr  = _build_gid_arr(df["category"].values)
+    same_cat = (gid_arr[:, None] == gid_arr[None, :]).astype(float)
+    # cross_cat removed — all intents are same-category
 
     ret_arr   = np.array(df["retailer"].values)
     same_ret  = (ret_arr[:, None] == ret_arr[None, :]).astype(float)
@@ -269,22 +672,25 @@ def _compute_scores(sims: dict, df: pd.DataFrame):
     penalty   = 1.0 - (rc < MIN_REVIEWS).astype(float) * 0.7
     tw        = stability * penalty
 
-    # Substitutes — same category, either retailer
-    # structural includes verification (Ulta) so alignment on trust profile matters
+    # All intents are same-category only.
+    # Hard same-category masking is also applied in _generate_csv (belt-and-suspenders).
+
+    # Substitutes — same category, similar perception + price tier
     sub  = (0.35 * content + 0.25 * sentiment + 0.20 * structural
             + 0.10 * price_sim + 0.10 * same_cat)
-    sub *= (same_cat * 0.5 + 0.5)   # same-category boost
+    sub *= same_cat                  # hard zero for any different-category item
     sub *= tw[np.newaxis, :]
 
-    # Complements — cross-category; slight nudge toward cross-retailer discovery
+    # Complements — same category, different sentiment/topic profile;
+    # slight nudge toward cross-retailer discovery within the same category
     comp  = (0.35 * content + 0.25 * sentiment + 0.20 * structural
-             + 0.15 * cross_cat + 0.05 * diff_ret)
-    comp *= cross_cat
+             + 0.15 * same_cat + 0.05 * diff_ret)
+    comp *= same_cat                 # hard zero for any different-category item
     comp *= tw[np.newaxis, :]
 
-    # Trade — same category, content + sentiment + structural, price filter applied below
+    # Trade — same category, price filter applied below
     base      = (0.50 * content + 0.30 * sentiment + 0.20 * structural)
-    base     *= (same_cat * 0.7 + 0.3) * tw[np.newaxis, :]
+    base     *= same_cat * tw[np.newaxis, :]   # hard zero for different-category items
     prices    = df["price"].fillna(0).values.astype(float)
     trade_up  = base * (prices[np.newaxis, :] > prices[:, np.newaxis] * 1.15).astype(float)
     trade_dn  = base * (prices[np.newaxis, :] < prices[:, np.newaxis] * 0.85).astype(float)
@@ -310,6 +716,10 @@ def _generate_csv(df: pd.DataFrame, sub, comp, trade_up, trade_dn,
     names    = df[name_col].fillna("").values if name_col in df.columns else [""] * n
     brands   = df["brand"].fillna("").values  if "brand"   in df.columns else [""] * n
     cats     = df["category"].fillna("").values
+    # pre-build group-id array for O(1) same-category checks in the inner loop
+    # (reuse _cat_to_gid populated during _compute_scores; fall back to _gid_for)
+    _gid_arr = np.array([_cat_to_gid.get(_norm_cat(c), -i-9999)
+                         for i, c in enumerate(cats)], dtype=np.int32)
     rets     = df["retailer"].fillna("").values
     prices   = df["price"].fillna(0).values.astype(float)
     ratings  = df["avg_rating"].fillna(0).values.astype(float)
@@ -347,15 +757,37 @@ def _generate_csv(df: pd.DataFrame, sub, comp, trade_up, trade_dn,
             ("tradeup", trade_up, TOP_N_TRADE),
             ("tradedn", trade_dn, TOP_N_TRADE),
         ]:
-            # Sort all products descending; skip excluded; take top_n
+            # Two-pass selection:
+            # Pass 1 — fill up to ceil(top_n/2) slots from the OTHER retailer (same cat)
+            # Pass 2 — fill remaining slots from ANY retailer (same cat), best score first
+            # This guarantees cross-retailer representation whenever products exist.
+            src_cat  = cats[i]
+            _src_gid = _gid_arr[i]
+            src_ret  = rets[i]
             sorted_j = np.argsort(matrix[i])[::-1]
-            selected = []
+
+            cross, same_ret_pool = [], []
             for j in sorted_j:
                 if pids[j] in excluded:
                     continue
-                selected.append(j)
-                if len(selected) == top_n:
-                    break
+                if _gid_arr[j] != _src_gid:   # vectorised same-category check
+                    continue
+                if rets[j] != src_ret:
+                    cross.append(j)
+                else:
+                    same_ret_pool.append(j)
+
+            # Reserve up to ceil(top_n/2) slots for cross-retailer; fill rest same-retailer
+            cross_slots = (top_n + 1) // 2   # ceil(top_n / 2)
+            cross_take  = cross[:cross_slots]
+            # Fill remaining from same-retailer, keeping overall order by score
+            remaining   = top_n - len(cross_take)
+            same_take   = same_ret_pool[:remaining]
+
+            # Merge and re-sort by score so the final ranking is score-ordered
+            combined_idx = cross_take + same_take
+            combined_idx.sort(key=lambda j: matrix[i, j], reverse=True)
+            selected = combined_idx[:top_n]
 
             for rank, j in enumerate(selected):
                 p = f"{prefix}_{rank+1}_"
@@ -432,7 +864,40 @@ def run_pipeline():
     combined = pd.concat([seph, ulta], ignore_index=True, sort=False).fillna(0)
     # Restore proper NaN for price (filled 0 is fine for ranking; flag for display)
     combined["price"] = pd.to_numeric(combined["price"], errors="coerce")
+
+    # Normalise category column in place so feature blocks & scoring are consistent
+    combined["category"] = combined["category"].apply(_norm_cat)
     print(f"    Joint catalog: {len(combined):,} products × {combined.shape[1]} cols")
+
+    # ── 3b. Category overlap report ───────────────────────────────────────────
+    print("\n  Category overlap (Sephora ↔ Ulta):")
+    seph_cats = set(combined.loc[combined["retailer"]=="sephora","category"].unique())
+    ulta_cats = set(combined.loc[combined["retailer"]=="ulta",   "category"].unique())
+    exact_match  = seph_cats & ulta_cats
+    alias_only_s = set()   # Sephora cats matched via alias but not exact
+    alias_only_u = set()
+    for sc in seph_cats - exact_match:
+        for uc in ulta_cats - exact_match:
+            if _same_category(sc, uc):
+                alias_only_s.add(sc); alias_only_u.add(uc)
+    seph_only    = seph_cats - exact_match - alias_only_s
+    ulta_only    = ulta_cats - exact_match - alias_only_u
+    print(f"    Exact match:  {len(exact_match)} categories")
+    if exact_match:
+        print("      " + ", ".join(sorted(exact_match)[:20]))
+    print(f"    Alias match:  {len(alias_only_s)} Sephora / {len(alias_only_u)} Ulta categories")
+    if alias_only_s:
+        pairs = [(s,u) for s in alias_only_s for u in alias_only_u if _same_category(s,u)]
+        for s,u in sorted(pairs)[:10]:
+            print(f"      '{s}'  ←→  '{u}'")
+    print(f"    Sephora-only: {len(seph_only)} categories")
+    if seph_only:
+        print("      " + ", ".join(sorted(seph_only)[:15]))
+    print(f"    Ulta-only:    {len(ulta_only)} categories")
+    if ulta_only:
+        print("      " + ", ".join(sorted(ulta_only)[:15]))
+    print(f"    NOTE: products in Sephora-only or Ulta-only categories will receive")
+    print(f"          same-retailer recommendations only. Add aliases above to fix.")
 
     # ── 4. Build features ─────────────────────────────────────────────────────
     print("\n  Building feature blocks...")
@@ -465,19 +930,24 @@ def run_pipeline():
                     dup_found += 1
     print(f"  Cross-match duplicates in recs: {dup_found}  (should be 0)")
 
-    # Same-category rate for substitutes
-    total, same = 0, 0
+    # Same-category rate across ALL intents (should be 100%)
     id_to_cat = dict(zip(combined["product_id"].astype(str), combined["category"]))
-    for _, row in recs_df.iterrows():
-        src_cat = id_to_cat.get(str(row["product_id"]), "")
-        for rk in range(1, TOP_N_SUB + 1):
-            sid = row.get(f"sub_{rk}_id")
-            if pd.notna(sid):
-                total += 1
-                if id_to_cat.get(str(sid), "") == src_cat:
-                    same += 1
-    if total:
-        print(f"  Substitute same-category rate: {same/total*100:.1f}%")
+    for prefix, label, top_n in [("sub","Substitutes",TOP_N_SUB),
+                                  ("comp","Complements",TOP_N_COMP),
+                                  ("tradeup","Trade-Up",TOP_N_TRADE),
+                                  ("tradedn","Trade-Down",TOP_N_TRADE)]:
+        total, same = 0, 0
+        for _, row in recs_df.iterrows():
+            src_cat = id_to_cat.get(str(row["product_id"]), "")
+            for rk in range(1, top_n + 1):
+                sid = row.get(f"{prefix}_{rk}_id")
+                if pd.notna(sid):
+                    total += 1
+                    if _same_category(id_to_cat.get(str(sid), ""), src_cat):
+                        same += 1
+        pct = same/total*100 if total else 0
+        flag = "✓" if pct == 100.0 else "✗"
+        print(f"  {flag} {label:<14} same-category: {same}/{total} ({pct:.1f}%)")
 
     # Cross-retailer coverage in substitutes
     cross_ret = 0

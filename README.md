@@ -521,6 +521,7 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   ├── brand_matching.py
 │   ├── build_product_graph.py
 │   ├── data_cleaning.py
+│   ├── joint_recommendations.py
 │   ├── scrape_sephora.py
 │   ├── scrape_ulta.py
 │   ├── segmentation_features.py
