@@ -352,6 +352,8 @@ All analyses converge into a unified strategic framework addressing:
 ALGORITHMIC_MARKETING_FINAL_PROJECT/
 ├── data/
 │   ├── processed/
+│   │   ├── Joint/
+│   │   │   ├── joint_recommendations.csv
 │   │   ├── Matched/
 │   │   │   ├── brand_mapping.csv
 │   │   │   ├── cross_retailer_graph.png
@@ -371,6 +373,7 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   │   │   ├── sephora_products.csv
 │   │   │   ├── sephora_recommendations.csv
 │   │   │   ├── sephora_reviews_enriched.csv
+│   │   │   ├── sephora_reviews_timeseries.csv
 │   │   │   ├── sephora_reviews.csv
 │   │   │   ├── sephora_segmentation.csv
 │   │   │   ├── sephora_topic_drivers.csv
@@ -385,6 +388,7 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   │       ├── ulta_products.csv
 │   │       ├── ulta_recommendations.csv
 │   │       ├── ulta_reviews_enriched.csv
+│   │       ├── ulta_reviews_timeseries.csv       
 │   │       ├── ulta_reviews.csv
 │   │       ├── ulta_segmentation.csv
 │   │       ├── ulta_topic_drivers.csv
