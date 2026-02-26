@@ -306,18 +306,28 @@ All analyses converge into a unified strategic framework addressing:
 
 - **Language:** Python
 - **Data Collection:**
-  - **Selenium** via `undetected-chromedriver` -- automated browser sessions with anti-detection, warm-up navigation, scroll-to-load pagination, and session rotation on access denial
-  - **BeautifulSoup** -- HTML parsing with multi-strategy extraction (CSS selectors, meta tags, JSON-LD, regex fallbacks)
-  - **Bazaarvoice API** -- Sephora review ingestion (`reviews.json` endpoint, paginated, with `ContextDataValues` for skin tone/type)
-  - **PowerReviews Read API** -- Ulta review ingestion (paginated via `readservices-b2c.powerreviews.com`, includes verified buyer badges, helpfulness votes, disclosure codes)
-  - **Incremental/crash-safe writes** -- per-brand CSV appends with brand slug tracking for resumable runs
+  - **Selenium** via `undetected-chromedriver` — automated browser sessions with anti-detection, warm-up navigation, scroll-to-load pagination, and session rotation on access denial
+  - **BeautifulSoup** — HTML parsing with multi-strategy extraction (CSS selectors, meta tags, JSON-LD, `__NEXT_DATA__` JSON, regex fallbacks)
+  - **Bazaarvoice API** — Sephora review ingestion (`reviews.json` endpoint, paginated, with `ContextDataValues` for skin tone/type)
+  - **PowerReviews Read API** — Ulta review ingestion (paginated via `readservices-b2c.powerreviews.com`, includes verified buyer badges, helpfulness votes, disclosure codes)
+  - **Incremental/crash-safe writes** — per-brand CSV appends with brand slug tracking for resumable runs
 - **Data Processing:** pandas, NumPy
-- **Machine Learning:** scikit-learn (clustering, classification, regression)
-- **NLP:** NLTK, spaCy, TF-IDF, sentiment analysis, topic modeling
-- **Statistical Modeling:** statsmodels (regression, causal inference)
+- **Machine Learning:** scikit-learn (clustering, cosine similarity, `StandardScaler`, classification, regression); Word2Vec embeddings; K-Means clustering; LSH (Locality-Sensitive Hashing) for similarity search
+- **NLP:**
+  - **VADER** (`vaderSentiment` / `nltk.sentiment.vader`) — compound sentiment scoring with positive/neutral/negative thresholding
+  - **LDA topic modeling** — dominant topic assignment and prevalence scores per product, used as content features in recommendation scoring
+  - NLTK, spaCy, TF-IDF, text preprocessing pipelines
+- **Recommendation System:**
+  - Item-to-item cosine similarity across four feature blocks (structural, sentiment, content, price)
+  - Multi-intent scoring (substitutes, complements, trade-up, trade-down) with same-category enforcement via alias-aware equivalence groups
+  - Cross-retailer deduplication using matched product pairs; two-pass selection guaranteeing cross-retailer representation
+  - Ulta verification provenance (verified buyer %, disclosure %, helpfulness rate) as structural signal
+- **Statistical Modeling:** statsmodels (regression, causal inference); OLS rolling trend slopes (via `numpy.polyfit`) for rating trajectory; negative shock detection via rolling threshold
 - **Causal Inference:** Difference-in-Differences, propensity score matching
-- **Visualization:** matplotlib, seaborn, perceptual maps
-- **Infrastructure:** PySpark (for scalable processing)
+- **Visualization:**
+  - **Plotly** — interactive multi-panel dashboards with hover tooltips, exported as self-contained HTML (no server required)
+  - **ipywidgets** — Jupyter dropdown interfaces for product-level exploration
+  - matplotlib, seaborn, perceptual maps
 
 ---
 
@@ -444,8 +454,8 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   │   └── 3-4_convergent_strategic_recommendation.ipynb
 │   ├── independent/
 │   │   ├── outputs/
-│   │   │   ├── brand_dashboards/
-│   │   │   ├── product_dashboards/
+│   │   │   ├── sephora_brand_dashboards/
+│   │   │   ├── sephora_product_dashboards/
 │   │   │   ├── sephora_segmentation/
 │   │   │   │   ├── gmm_uw_bic_aic_silhouette.png
 │   │   │   │   ├── gmm_w_bic_aic_silhouette.png
@@ -461,6 +471,8 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   │   │   │   ├── profile_hierarchical_weighted.png
 │   │   │   │   ├── profile_kmeans_unweighted.png
 │   │   │   │   └── profile_kmeans_weighted.png
+│   │   │   ├── ulta_brand_dashboards/
+│   │   │   ├── ulta_product_dashboards/
 │   │   │   ├── ulta_segmentation/
 │   │   │   │   ├── gmm_uw_bic_aic_silhouette.png
 │   │   │   │   ├── gmm_w_bic_aic_silhouette.png
@@ -490,6 +502,7 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   │   └── ulta_sentiment.ipynb
 │   └── joint/
 │       ├── outputs/
+│       │   ├── product_dashboards/
 │       │   ├── 2.1_product_graph_brand_networrk.png
 │       │   ├── 2.1_product_graph_category_heatmap.png
 │       │   ├── 2.1_product_graph_coverage.png
@@ -510,16 +523,19 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │       │   ├── 2.4_price_tier_analysis.png
 │       │   ├── 2.4_price_vs_experience_delta.png
 │       │   ├── 2.4_price_vs_value_scatter.png
-│       │   └── 2.4_value_efficiency.png
+│       │   ├── 2.4_value_efficiency.png
+│       │   └── joint_product_dashboards_index.html
 │       ├── 2-1_product_graph.ipynb
 │       ├── 2-2_matched_segmentation.ipynb
 │       ├── 2-3_setiment_gap.ipynb
-│       └── 2-4_perceived_value.ipynb
+│       ├── 2-4_perceived_value.ipynb
+│       └── 2-5_joint_recommendations.ipynb
 ├── src/
 │   ├── __pycache__/
 │   ├── __init__.py
 │   ├── brand_matching.py
 │   ├── build_product_graph.py
+│   ├── build_review_timeseries.py
 │   ├── data_cleaning.py
 │   ├── joint_recommendations.py
 │   ├── scrape_sephora.py
@@ -528,8 +544,7 @@ ALGORITHMIC_MARKETING_FINAL_PROJECT/
 │   ├── sephora_recommendations.py
 │   ├── sephora_sentiment.py
 │   ├── ulta_recommendations.py
-│   ├── ulta_sentiment.py
-│   └── utils.py
+│   └── ulta_sentiment.py
 ├── venv_scrape/
 ├── .gitattributes
 ├── README.md
@@ -661,8 +676,6 @@ python src/segmentation_features.py
 
 ---
 
----
-
 #### `src/sephora_sentiment.py`
 
 **What it does:** Full brand health and sentiment pipeline for Sephora, covering nine processing steps and an interactive dashboard layer. Steps 1–9 run as a script: text cleaning and review filtering, VADER sentiment scoring, rating–sentiment mismatch detection, NMF topic modeling on TF-IDF features, topic–sentiment driver linkage, per-brand delighter and disappointer identification, complaint concentration analysis via entropy scoring, price/value perception diagnostics, and brand-level aggregation. Step 9 also writes the static HTML brand health overview — average VADER sentiment vs. average star rating scatter sized by review volume and colored by mismatch rate — which is saved as a standalone file viewable in any browser. Step 10 is available in two modes. In a Jupyter notebook, `show_dashboard()` launches an ipywidgets dropdown that toggles a 12-panel per-brand dashboard across all qualifying brands. For browser access without a notebook, `write_brand_html()` saves a single brand's dashboard as a self-contained HTML, and `write_all_brand_htmls()` saves every qualifying brand and generates a linked index page listing all brands.
@@ -771,8 +784,6 @@ write_all_brand_htmls(output_dir="my_reports/brands/")
 
 ---
 
----
-
 #### `src/sephora_recommendations.py`
 
 **What it does:** Builds a content-based product recommendation engine for the Sephora catalog across three recommendation intents — close substitutes (same need, similar perception), complementary products (different need, shared audience), and trade-up/trade-down paths (same experience, different price tier). Constructs four feature blocks per product: structural (category dummies and skin tone/type distributions), sentiment (VADER scores, rating distributions, and rating-sentiment mismatch), content (dominant topic and topic prevalence), and price (log-transformed price and category-relative positioning). Computes cosine similarity matrices per block, then combines them into intent-specific composite scores with block weights tuned per intent. Exports a precomputed recommendations table mapping each product to its top substitutes, complements, trade-up, and trade-down matches. The dashboard layer is available in two modes. In a Jupyter notebook, `show_dashboard()` launches an ipywidgets dropdown that toggles an 8-panel per-product dashboard across the full catalog. For browser access without a notebook, `write_product_html()` saves a single product's dashboard as a self-contained HTML, and `write_all_product_htmls()` saves every product in the catalog and generates a linked index page searchable by brand, product name, and category.
@@ -854,6 +865,43 @@ write_all_product_htmls(output_dir="my_reports/ulta_products/")
 ```
 
 **Notes:** `show_dashboard()` requires a running Jupyter server with `ipywidgets` enabled. The browser export functions have no such requirement. `write_all_product_htmls()` may take several minutes for the full catalog — use `write_product_html()` in a loop for targeted subsets. The pipeline also reports a substitute verification gap metric (average percentage-point difference in verified buyer rate between source and recommended products) as a quality check.
+
+---
+
+#### `src/joint_recommendations.py`
+
+**What it does:** Cross-catalog recommendation engine that ingests both Sephora and Ulta segmentation CSVs and produces a unified recommendation set spanning both retailers. Builds a joint feature space from four blocks — structural (Sephora skin-tone/type signals + Ulta verification provenance), sentiment (ratings, VADER scores, star distributions, rating-sentiment mismatch), LDA topic content, and price tier — zero-filling retailer-specific columns where absent. Computes cosine similarity matrices across the full combined catalog, then scores four recommendation intents (substitutes, complements, trade-up, trade-down) with all intents hard-constrained to the same product category. Category matching is alias-aware: 73 equivalence groups map mismatched Sephora/Ulta shelf names (e.g. `"Cologne"` ↔ `"Fragrance"`, `"Contour"` ↔ `"Contouring"`) so cross-retailer products compete fairly. Cross-retailer matched products (from `matched_pairs.csv`) are excluded from every product's recommendations to prevent recommending the same item twice. The two-pass selection loop reserves `⌈top_n/2⌉` slots for the opposite retailer before filling remaining slots same-retailer, guaranteeing cross-retailer representation. Exports a per-product Plotly dashboard (self-contained HTML, no Jupyter required) with bar charts colored by retailer and — for Ulta items — by verification provenance (organic/seeded/low). An index page with a live search filter links all dashboards.
+
+**Outputs:**
+- `data/processed/Joint/joint_recommendations.csv` — one row per product with top-N substitute, complement, trade-up, and trade-down recommendations, each annotated with retailer, score, price, sentiment, rating, and Ulta verification fields
+- `notebooks/joint/outputs/product_dashboards/*.html` — per-product recommendation dashboards
+- `notebooks/joint/outputs/joint_product_dashboards_index.html` — searchable index of all dashboards
+
+**Usage:**
+```bash
+python src/joint_recommendations.py build_csv
+python src/joint_recommendations.py write_htmls --limit 200
+```
+```python
+from src.joint_recommendations import run_pipeline, show_dashboard
+run_pipeline()       # build CSV
+show_dashboard()     # Jupyter dropdown across full joint catalog
+```
+
+---
+
+#### `src/build_review_timeseries.py`
+
+**What it does:** Transforms raw per-review CSVs into monthly product-level timeseries for both Sephora and Ulta. Column names are resolved via alias tables so the script handles schema variation across scraping runs without manual renaming. Review dates are parsed format-agnostically — Unix millisecond timestamps (Ulta) are detected automatically and converted, string dates (Sephora) use pandas inference. Sentiment scores are taken from a pre-computed column if present; otherwise VADER compound scores are computed from raw review text on the fly. Each product-month record captures review volume, mean and std of ratings, star distribution, sentiment breakdown (positive/neutral/negative), and a suite of rolling and lagged features: 3-month velocity and rating averages, OLS rating trend slope, a negative-shock flag (triggered when `pct_negative` exceeds 1.5× its own 3-month rolling mean), and one- and two-month review count lags. Metadata (brand, category, price) is left-joined from the product file when available. Output is written incrementally per platform.
+
+**Outputs:**
+- `data/processed/Sephora/sephora_reviews_timeseries.csv`
+- `data/processed/Ulta/ulta_reviews_timeseries.csv`
+
+**Usage:**
+```bash
+python src/build_review_timeseries.py
+```
 
 ---
 
@@ -1092,6 +1140,20 @@ write_all_product_htmls()
 
 ---
 
+#### `2-5_joint_recommendations.ipynb`
+
+**What it does:** Interactive companion to `joint_recommendations.py`. Loads the pre-built `joint_recommendations.csv` and provides an `ipywidgets` dropdown to browse the full joint Sephora + Ulta catalog in a single interface. Each selection renders a 4-row × 2-column Plotly dashboard: substitutes (price and sentiment panels), complements, trade-up, trade-down, an intent-level average score bar chart, and a full detail table. Sephora items are colored in brand green; Ulta substitute bars are colored by verification provenance (green = organic verified buyers, orange = seeded/disclosed, blue = low verification) with a badge in the product header. The notebook is designed for post-pipeline exploration — it reads from CSV and does no recomputation, so it loads in seconds even for large catalogs.
+
+**Usage:**
+
+```python
+# Run src/joint_recommendations.py build_csv first, then:
+from src.joint_recommendations import show_dashboard
+show_dashboard()
+```
+
+---
+
 ### Part 3 — Comparative and Convergent Strategy (`notebooks/comparative/`)
 
 ---
@@ -1229,35 +1291,51 @@ write_all_product_htmls()
 
 For a clean run from raw data to final recommendations, execute files in this order:
 
+**Scripts — run all from terminal first:**
+
 1.  python src/scrape_sephora.py
 2.  python src/scrape_ulta.py
 3.  python src/data_cleaning.py
-4.  python src/brand_matching.py
-5.  python src/build_product_graph.py
-6.  python src/segmentation_features.py
-7.  python src/sephora_sentiment.py
-8.  python src/ulta_sentiment.py
-9.  python src/sephora_recommendations.py
-10. python src/ulta_recommendations.py
+4.  python src/build_review_timeseries.py
+5.  python src/brand_matching.py
+6.  python src/build_product_graph.py
+7.  python src/segmentation_features.py
+8.  python src/sephora_sentiment.py
+9.  python src/ulta_sentiment.py
+10. python src/sephora_recommendations.py
+11. python src/ulta_recommendations.py
+12. python src/joint_recommendations.py build_csv
+13. python src/joint_recommendations.py write_htmls --limit 200
 
-Then open Jupyter and run notebooks in this order:
+**Notebooks — open Jupyter and run in this order:**
 
-11. notebooks/independent/sephora_segmentation.ipynb
-12. notebooks/independent/ulta_segmentation.ipynb
-13. notebooks/independent/sephora_sentiment.ipynb
-14. notebooks/independent/ulta_sentiment.ipynb
-15. notebooks/independent/sephora_recommendations.ipynb
-16. notebooks/independent/ulta_recommendations.ipynb
-17. notebooks/joint/2-1_product_graph.ipynb
-18. notebooks/joint/2-2_matched_segmentation.ipynb
-19. notebooks/joint/2-3_setiment_gap.ipynb
-20. notebooks/joint/2-4_perceived_value.ipynb
-21. notebooks/comparative/3-1_competitive_positioning.ipynb
-22. notebooks/comparative/3-1_combined_perceptual_map.ipynb
-23. notebooks/comparative/3-2_perceived_value.ipynb
-24. notebooks/comparative/3-2_coss_retailer_simulations.ipynb
-25. notebooks/comparative/3-3_causal_attribution.ipynb
-26. notebooks/comparative/3-4_convergent_strategic_recommendation.ipynb
+*Independent:*
+14. notebooks/independent/sephora_segmentation.ipynb
+15. notebooks/independent/ulta_segmentation.ipynb
+16. notebooks/independent/sephora_sentiment.ipynb
+17. notebooks/independent/ulta_sentiment.ipynb
+18. notebooks/independent/sephora_recommendations.ipynb
+19. notebooks/independent/ulta_recommendations.ipynb
+
+*Joint:*
+20. notebooks/joint/2-1_product_graph.ipynb
+21. notebooks/joint/2-2_matched_segmentation.ipynb
+22. notebooks/joint/2-3_sentiment_gap.ipynb  
+23. notebooks/joint/2-4_perceived_value.ipynb 
+24. notebooks/joint/2-5_joint_recommendations.ipynb
+
+*Comparative:*
+25. notebooks/comparative/3-1_competitive_positioning.ipynb
+26. notebooks/comparative/3-1_combined_perceptual_map.ipynb
+27. notebooks/comparative/3-2_perceived_value.ipynb
+28. notebooks/comparative/3-2_cross_retailer_simulations.ipynb
+29. notebooks/comparative/3-3_causal_attribution.ipynb
+30. notebooks/comparative/3-4_convergent_strategic_recommendation.ipynb
+
+**Dependency notes:**
+- Step 4 (`build_review_timeseries.py`) requires processed review CSVs from step 3; its output feeds rolling sentiment and velocity features used in steps 29–30
+- Steps 12–13 require `matched_pairs.csv` produced by step 5 and both segmentation CSVs from steps 7–9
+- Steps 28–30 consume the timeseries output from step 4 for causal attribution and simulation
 
 ---
 
