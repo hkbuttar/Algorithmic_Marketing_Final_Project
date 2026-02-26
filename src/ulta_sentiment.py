@@ -53,7 +53,7 @@ Outputs (CSVs):
 
 Outputs (HTML):
   notebooks/independent/outputs/ulta_brand_health_overview.html        (overview scatter, browser)
-  notebooks/independent/outputs/brand_dashboards/<brand>_<seg>.html    (per-brand × segment, browser)
+  notebooks/independent/outputs/ulta_brand_dashboards/<brand>_<seg>.html    (per-brand × segment, browser)
   notebooks/independent/outputs/ulta_brand_dashboards_index.html            (index page, browser)
 """
 
@@ -70,7 +70,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = _SCRIPT_DIR.parent
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "ulta"
 OUTPUT_DIR = PROJECT_ROOT / "notebooks" / "independent" / "outputs"
-BRAND_DASHBOARD_DIR = OUTPUT_DIR / "brand_dashboards"
+BRAND_DASHBOARD_DIR = OUTPUT_DIR / "ulta_brand_dashboards"
 MIN_BRAND_REVIEWS = 30
 N_TOPICS = 12
 MIN_REVIEW_LENGTH = 20
